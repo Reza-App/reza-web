@@ -1,23 +1,6 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
-
+/** `proxy.ts` already routes "/" by session; this is the safe fallback. */
 export default function Home() {
-  const router = useRouter();
-  const { isAuthenticated } = useAuth();
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      router.push('/dashboard/rendez-vous');
-    } else {
-      router.push('/login');
-    }
-  }, [isAuthenticated, router]);
-
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50">
-    </div>
-  );
+  redirect('/login');
 }

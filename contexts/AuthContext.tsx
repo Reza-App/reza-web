@@ -1,66 +1,134 @@
 'use client';
 
-import React, { createContext, useContext, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { api } from '@/lib/api/client';
+import { ApiError } from '@/lib/api/errors';
+import { sessionService } from '@/lib/api/services/session.service';
+import type { SalonSummary, Session, SessionUser } from '@/lib/types/session';
 
-interface User {
-  email: string;
-  name: string;
-}
+type AuthStatus = 'loading' | 'authenticated' | 'anonymous';
 
-interface AuthContextType {
-  user: User | null;
-  login: (email: string, password: string) => boolean;
-  logout: () => void;
+interface AuthContextValue {
+  status: AuthStatus;
+  user: SessionUser | null;
+  salons: SalonSummary[];
+  activeSalon: SalonSummary | null;
   isAuthenticated: boolean;
+  /** Signs in and returns the new session (its role decides the landing page). */
+  login: (email: string, password: string, remember?: boolean) => Promise<Session>;
+  logout: () => Promise<void>;
+  switchSalon: (tenantId: string) => Promise<void>;
+  refresh: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+/**
+ * Holds the signed in staff session. The token itself lives in an httpOnly
+ * cookie handled by the BFF; this context only keeps the public profile.
+ */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => {
-    // Initialize from localStorage
-    if (typeof window !== 'undefined') {
-      const storedUser = localStorage.getItem('user');
-      return storedUser ? JSON.parse(storedUser) : null;
-    }
-    return null;
-  });
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return !!localStorage.getItem('user');
-    }
-    return false;
-  });
+  const router = useRouter();
+  const [session, setSession] = useState<Session | null>(null);
+  const [status, setStatus] = useState<AuthStatus>('loading');
 
-  const login = (email: string, password: string): boolean => {
-    // Updated credentials
-    if (email === 'wail@ouz.ma' && password === 'ouz1234') {
-      const userData = { email, name: 'Wail Ouz' };
-      localStorage.setItem('user', JSON.stringify(userData));
-      setUser(userData);
-      setIsAuthenticated(true);
-      return true;
+  const refresh = useCallback(async () => {
+    try {
+      const current = await sessionService.current();
+      setSession(current);
+      setStatus('authenticated');
+    } catch (error) {
+      if (error instanceof ApiError && error.isUnauthorized) {
+        setSession(null);
+        setStatus('anonymous');
+        return;
+      }
+      throw error;
     }
-    return false;
-  };
+  }, []);
 
-  const logout = () => {
-    localStorage.removeItem('user');
-    setUser(null);
-    setIsAuthenticated(false);
-  };
+  // Initial session check (state only changes once the request resolves).
+  useEffect(() => {
+    let active = true;
+    sessionService
+      .current()
+      .then((current) => {
+        if (!active) return;
+        setSession(current);
+        setStatus('authenticated');
+      })
+      .catch(() => {
+        if (!active) return;
+        setSession(null);
+        setStatus('anonymous');
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
-  return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated }}>
-      {children}
-    </AuthContext.Provider>
+  // Any 401 from the API means the session is gone: go back to the login page.
+  useEffect(
+    () =>
+      api.onUnauthorized(() => {
+        setSession(null);
+        setStatus('anonymous');
+        const next = `${window.location.pathname}${window.location.search}`;
+        if (window.location.pathname.startsWith('/dashboard') || window.location.pathname.startsWith('/plateforme')) {
+          router.replace(`/login?next=${encodeURIComponent(next)}`);
+        }
+      }),
+    [router],
   );
+
+  const login = useCallback(async (email: string, password: string, remember = false) => {
+    const next = await sessionService.login(email, password, remember);
+    setSession(next);
+    setStatus('authenticated');
+    return next;
+  }, []);
+
+  const logout = useCallback(async () => {
+    try {
+      await sessionService.logout();
+    } finally {
+      setSession(null);
+      setStatus('anonymous');
+      router.replace('/login');
+      router.refresh();
+    }
+  }, [router]);
+
+  const switchSalon = useCallback(
+    async (tenantId: string) => {
+      await sessionService.switchSalon(tenantId);
+      await refresh();
+      router.refresh();
+    },
+    [refresh, router],
+  );
+
+  const value = useMemo<AuthContextValue>(() => {
+    const salons = session?.salons ?? [];
+    return {
+      status,
+      user: session?.user ?? null,
+      salons,
+      activeSalon: salons.find((s) => s.id === session?.activeTenantId) ?? null,
+      isAuthenticated: status === 'authenticated',
+      login,
+      logout,
+      switchSalon,
+      refresh,
+    };
+  }, [session, status, login, logout, switchSalon, refresh]);
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export const useAuth = () => {
+export function useAuth(): AuthContextValue {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
-};
+}

@@ -1,616 +1,190 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { DollarSign, CreditCard, RefreshCcw, Download, Plus, Search, Filter, Calendar, Users, X, ChevronDown, ChevronUp, TrendingUp, TrendingDown, Wallet, Receipt, Clock, BarChart3, PieChart, Eye, Printer, FileText, ArrowUpRight, ArrowDownRight } from 'lucide-react';
-import { BarChart, Bar, PieChart as RePieChart, Pie, Cell, ResponsiveContainer, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts';
-import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
-import { generateCaissePDF } from '@/components/CaissePrintDocument';
+import { useMemo, useState } from 'react';
+import { ArrowLeftRight, Download, Plus, Printer, Search } from 'lucide-react';
+import { CollectDialog, MovementDialog, SaleDialog } from '@/components/caisse/CaisseDialogs';
+import { ShareBars } from '@/components/charts/Charts';
+import { Logo } from '@/components/brand/Logo';
+import { PrimaryButton } from '@/components/ui/modal';
+import { Badge, Card, PageHeader, Pagination, StatCard, Table } from '@/components/ui/page';
+import { EmptyState, QueryBoundary } from '@/components/ui/states';
+import { useApiQuery } from '@/hooks/useApiQuery';
+import { useUrlState } from '@/hooks/useUrlState';
+import { useAuth } from '@/contexts/AuthContext';
+import { cashService, type Invoice, INVOICE_STATUS_LABELS, invoiceService } from '@/lib/api/services/invoice.service';
+import { buildLedger, cashPeriodRange, ledgerTotals } from '@/lib/cash';
+import { downloadCsv } from '@/lib/csv';
+import { INVOICE_STATUS_TONES, statusTone } from '@/lib/status';
+import { formatDateTime, formatMoney } from '@/lib/format';
+import { ToneButton } from '@/components/ui/actions';
+import { useUrlAction } from '@/hooks/useUrlAction';
+import { usePagination } from '@/hooks/usePagination';
+import {
+  CASH_PERIOD_LABELS,
+  CASH_PERIODS,
+  type CashPeriod,
+  LEDGER_TYPE_LABELS,
+  PAYMENT_METHOD_LABELS,
+  type PaymentMethod,
+  paymentMethodLabel,
+} from '@/lib/types/cash';
 
-interface Transaction {
-  id: string;
-  type: 'Vente' | 'Remboursement' | 'Dépôt' | 'Retrait';
-  amount: number;
-  method: 'Espèces' | 'Carte' | 'Virement' | 'Chèque';
-  client?: string;
-  employee?: string;
-  date: Date;
-  note?: string;
-  category?: string;
-}
+export default function CaissePage() {
+  const { get } = useUrlState();
+  const { activeSalon } = useAuth();
+  const rawPeriod = get('period', 'month') as CashPeriod;
+  const period: CashPeriod = CASH_PERIODS.includes(rawPeriod) ? rawPeriod : 'month';
+  const typeFilter = get('type', 'all');
+  const methodFilter = get('method', 'all');
+  const [search, setSearch] = useState('');
+  const [dialog, setDialog] = useState<'sale' | 'movement' | null>(null);
+  const [collecting, setCollecting] = useState<Invoice | null>(null);
+  useUrlAction({ sale: () => setDialog('sale'), movement: () => setDialog('movement') });
 
-interface CaissePageProps {
-  methodFilter: 'all' | 'Espèces' | 'Carte' | 'Virement' | 'Chèque';
-  typeFilter: 'all' | 'Vente' | 'Remboursement' | 'Dépôt' | 'Retrait';
-  selectedPeriod: 'day' | 'week' | 'month' | 'all';
-  setMethodFilter: (filter: 'all' | 'Espèces' | 'Carte' | 'Virement' | 'Chèque') => void;
-  setTypeFilter: (filter: 'all' | 'Vente' | 'Remboursement' | 'Dépôt' | 'Retrait') => void;
-  setSelectedPeriod: (period: 'day' | 'week' | 'month' | 'all') => void;
-}
-
-export default function CaissePage({
-  methodFilter,
-  typeFilter,
-  selectedPeriod,
-  setMethodFilter,
-  setTypeFilter,
-  setSelectedPeriod,
-}: CaissePageProps) {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showModal, setShowModal] = useState(false);
-  const [formData, setFormData] = useState({
-    type: 'Vente' as Transaction['type'],
-    amount: 0,
-    method: 'Espèces' as Transaction['method'],
-    client: '',
-    employee: '',
-    note: ''
-  });
-  const printRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    // Sample transactions with more data
-    const sample: Transaction[] = [
-      {
-        id: '1',
-        type: 'Vente',
-        amount: 350,
-        method: 'Espèces',
-        client: 'Fatima Zahra El Amrani',
-        employee: 'Yassine El Fassi',
-        date: new Date('2024-06-01T10:15:00'),
-        note: 'Coupe et brushing',
-        category: 'Coiffure'
-      },
-      {
-        id: '2',
-        type: 'Vente',
-        amount: 480,
-        method: 'Carte',
-        client: 'Mohamed Benali',
-        employee: 'Samira Bouzid',
-        date: new Date('2024-06-01T11:30:00'),
-        note: 'Coloration',
-        category: 'Coloration'
-      },
-      {
-        id: '3',
-        type: 'Remboursement',
-        amount: -120,
-        method: 'Espèces',
-        client: 'Imane El Idrissi',
-        employee: 'Khalid Ait Lahcen',
-        date: new Date('2024-06-02T09:45:00'),
-        note: 'Annulation RDV',
-        category: 'Remboursement'
-      },
-      {
-        id: '4',
-        type: 'Dépôt',
-        amount: 1000,
-        method: 'Virement',
-        employee: 'Nadia El Khatib',
-        date: new Date('2024-06-02T14:00:00'),
-        note: 'Dépôt caisse',
-        category: 'Dépôt'
-      },
-      {
-        id: '5',
-        type: 'Retrait',
-        amount: -500,
-        method: 'Chèque',
-        employee: 'Rachid Benjelloun',
-        date: new Date('2024-06-03T16:30:00'),
-        note: 'Retrait pour achat fournitures',
-        category: 'Fournitures'
-      },
-      {
-        id: '6',
-        type: 'Vente',
-        amount: 280,
-        method: 'Carte',
-        client: 'Laila Bennani',
-        employee: 'Yassine El Fassi',
-        date: new Date('2024-06-03T14:20:00'),
-        note: 'Coupe homme',
-        category: 'Coiffure'
-      },
-      {
-        id: '7',
-        type: 'Vente',
-        amount: 650,
-        method: 'Espèces',
-        client: 'Hassan El Khatib',
-        employee: 'Samira Bouzid',
-        date: new Date('2024-06-03T15:45:00'),
-        note: 'Soin capillaire complet',
-        category: 'Soins'
-      },
-      {
-        id: '8',
-        type: 'Vente',
-        amount: 420,
-        method: 'Carte',
-        client: 'Aisha Mansouri',
-        employee: 'Khalid Ait Lahcen',
-        date: new Date('2024-06-04T10:00:00'),
-        note: 'Brushing et coiffure',
-        category: 'Coiffure'
-      },
-      {
-        id: '9',
-        type: 'Vente',
-        amount: 180,
-        method: 'Espèces',
-        client: 'Omar Ziani',
-        employee: 'Nadia El Khatib',
-        date: new Date('2024-06-04T11:30:00'),
-        note: 'Coupe barbe',
-        category: 'Barber'
-      },
-      {
-        id: '10',
-        type: 'Vente',
-        amount: 550,
-        method: 'Virement',
-        client: 'Salma Tazi',
-        employee: 'Rachid Benjelloun',
-        date: new Date('2024-06-04T13:15:00'),
-        note: 'Coloration premium',
-        category: 'Coloration'
-      },
-    ];
-    setTransactions(sample);
-  }, []);
-
-  // Filtering
-  const filteredTransactions = transactions.filter(tx => {
-    const matchesSearch =
-      tx.client?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tx.employee?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tx.note?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tx.method.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesMethod = methodFilter === 'all' || tx.method === methodFilter;
-    const matchesType = typeFilter === 'all' || tx.type === typeFilter;
-    return matchesSearch && matchesMethod && matchesType;
+  const query = useApiQuery(`caisse:${period}`, async (signal) => {
+    const range = cashPeriodRange(period);
+    const [invoices, cash] = await Promise.all([invoiceService.list(range, signal), cashService.list(range, signal)]);
+    return buildLedger(invoices, cash.transactions);
   });
 
-  // Stats
-  const totalSales = transactions.filter(t => t.type === 'Vente').reduce((sum, t) => sum + t.amount, 0);
-  const totalCash = transactions.filter(t => t.method === 'Espèces').reduce((sum, t) => sum + t.amount, 0);
-  const totalCard = transactions.filter(t => t.method === 'Carte').reduce((sum, t) => sum + t.amount, 0);
-  const totalRefunds = transactions.filter(t => t.type === 'Remboursement').reduce((sum, t) => sum + t.amount, 0);
-  const totalDeposits = transactions.filter(t => t.type === 'Dépôt').reduce((sum, t) => sum + t.amount, 0);
-  const totalWithdrawals = transactions.filter(t => t.type === 'Retrait').reduce((sum, t) => sum + t.amount, 0);
+  const ledger = useMemo(() => query.data ?? [], [query.data]);
+  const totals = useMemo(() => ledgerTotals(ledger), [ledger]);
+  const rows = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return ledger.filter(
+      (e) =>
+        (typeFilter === 'all' || e.type === typeFilter) &&
+        (methodFilter === 'all' || e.method === methodFilter) &&
+        (!term || e.label.toLowerCase().includes(term) || e.reference?.toLowerCase().includes(term)),
+    );
+  }, [ledger, typeFilter, methodFilter, search]);
+  const pager = usePagination(rows, 15, `${period}|${typeFilter}|${methodFilter}|${search}`);
 
-  // Export CSV
-  const exportToCSV = () => {
-    const headers = ['Type', 'Montant', 'Méthode', 'Client', 'Employé', 'Date', 'Note'];
-    const rows = filteredTransactions.map(tx => [
-      tx.type,
-      tx.amount,
-      tx.method,
-      tx.client || '',
-      tx.employee || '',
-      tx.date.toLocaleString('fr-FR'),
-      tx.note || ''
-    ]);
-    const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'transactions-caisse.csv';
-    a.click();
-  };
-
-  // Add transaction
-  const handleAddTransaction = (e: React.FormEvent) => {
-    e.preventDefault();
-    const newTx: Transaction = {
-      id: (transactions.length + 1).toString(),
-      ...formData,
-      amount: Number(formData.amount),
-      date: new Date(),
-    };
-    setTransactions([newTx, ...transactions]);
-    setShowModal(false);
-    setFormData({ type: 'Vente', amount: 0, method: 'Espèces', client: '', employee: '', note: '' });
-  };
-
-  // Print handler
-  const handlePrint = () => {
-    generateCaissePDF({
-      transactions,
-      totalSales,
-      totalCash,
-      totalCard,
-      totalRefunds,
-      totalDeposits,
-      totalWithdrawals,
-    });
-  };
+  const exportCsv = () =>
+    downloadCsv(
+      `caisse-${period}-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Date', 'Type', 'Référence', 'Libellé', 'Moyen', 'Statut', 'Montant'],
+      rows.map((e) => [
+        formatDateTime(e.date),
+        LEDGER_TYPE_LABELS[e.type],
+        e.reference ?? '',
+        e.label,
+        paymentMethodLabel(e.method),
+        e.status ? INVOICE_STATUS_LABELS[e.status] : '',
+        e.amount.toFixed(2),
+      ]),
+    );
 
   return (
-    <div className="min-h-screen">
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes slideUp {
-          from { transform: translateY(20px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        .animate-fadeIn { animation: fadeIn 0.2s ease-out; }
-        .animate-slideUp { animation: slideUp 0.3s ease-out; }
-        .accent-bg { background-color: #002366 !important; }
-        .accent-text { color: #002366 !important; }
-        /* Hide number input arrows for montant field */
-        input[type=number].no-arrows {
-          appearance: textfield;
-        }
-        input[type=number].no-arrows::-webkit-inner-spin-button,
-        input[type=number].no-arrows::-webkit-outer-spin-button {
-          -webkit-appearance: none;
-          margin: 0;
-        }
-        input[type=number].no-arrows {
-          -moz-appearance: textfield;
-        }
-      `}</style>
-
-      {/* Header */}
-      <div className="mb-8 pt-20 animate-slideUp">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-5xl font-light text-gray-900 tracking-tight mb-2">Caisse</h1>
-            <p className="text-sm text-gray-400">Gestion des transactions et flux financiers</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={exportToCSV}
-              className="px-5 py-2 bg-[#002366] text-white text-sm font-medium rounded-full hover:bg-gray-800 transition-colors flex items-center gap-2"
-            >
-              <Download size={16} />
-              Exporter
-            </button>
-            <button
-              onClick={() => setShowModal(true)}
-              className="px-5 py-2 bg-emerald-600 text-white text-sm font-medium rounded-full hover:bg-emerald-700 transition-colors flex items-center gap-2"
-            >
-              <Plus size={16} />
-              Ajouter
-            </button>
-          </div>
-        </div>
+    <div>
+      <div className="mb-6 hidden print:block">
+        <Logo variant="pro" height={40} />
+        <p className="mt-3 text-sm">
+          {activeSalon?.name} · Rapport de caisse · {CASH_PERIOD_LABELS[period]} · imprimé le {formatDateTime(new Date())}
+        </p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8 animate-fadeIn">
-        <div className="bg-white rounded-lg border border-gray-100 p-6">
-          <div className="flex items-center gap-2 mb-2">
-            <DollarSign className="text-gray-400" size={18} />
-            <span className="text-xs text-gray-400">Ventes</span>
+      <PageHeader
+        title="Caisse"
+        description={`${CASH_PERIOD_LABELS[period]} · ventes, encaissements et mouvements du tiroir.`}
+        actions={
+          <div className="no-print flex flex-wrap gap-2">
+            <ToneButton tone="green" onClick={exportCsv} disabled={!rows.length}>
+              <Download size={16} /> Exporter
+            </ToneButton>
+            <ToneButton tone="violet" onClick={() => window.print()}>
+              <Printer size={16} /> Imprimer
+            </ToneButton>
+            <ToneButton tone="amber" onClick={() => setDialog('movement')}>
+              <ArrowLeftRight size={16} /> Mouvement
+            </ToneButton>
+            <PrimaryButton onClick={() => setDialog('sale')}>
+              <Plus size={16} /> Nouvelle vente
+            </PrimaryButton>
           </div>
-          <p className="text-2xl font-light text-gray-900">{totalSales} MAD</p>
-        </div>
-        <div className="bg-white rounded-lg border border-gray-100 p-6">
-          <div className="flex items-center gap-2 mb-2">
-            <DollarSign className="text-gray-400" size={18} />
-            <span className="text-xs text-gray-400">Espèces</span>
-          </div>
-          <p className="text-2xl font-light text-gray-900">{totalCash} MAD</p>
-        </div>
-        <div className="bg-white rounded-lg border border-gray-100 p-6">
-          <div className="flex items-center gap-2 mb-2">
-            <CreditCard className="text-gray-400" size={18} />
-            <span className="text-xs text-gray-400">Carte</span>
-          </div>
-          <p className="text-2xl font-light text-gray-900">{totalCard} MAD</p>
-        </div>
-        <div className="bg-white rounded-lg border border-gray-100 p-6">
-          <div className="flex items-center gap-2 mb-2">
-            <RefreshCcw className="text-gray-400" size={18} />
-            <span className="text-xs text-gray-400">Remboursements</span>
-          </div>
-          <p className="text-2xl font-light text-gray-900">{totalRefunds} MAD</p>
-        </div>
-        <div className="bg-white rounded-lg border border-gray-100 p-6">
-          <div className="flex items-center gap-2 mb-2">
-            <DollarSign className="text-gray-400" size={18} />
-            <span className="text-xs text-gray-400">Dépôts</span>
-          </div>
-          <p className="text-2xl font-light text-gray-900">{totalDeposits} MAD</p>
-        </div>
-        <div className="bg-white rounded-lg border border-gray-100 p-6">
-          <div className="flex items-center gap-2 mb-2">
-            <DollarSign className="text-gray-400" size={18} />
-            <span className="text-xs text-gray-400">Retraits</span>
-          </div>
-          <p className="text-2xl font-light text-gray-900">{totalWithdrawals} MAD</p>
-        </div>
-      </div>
+        }
+      />
 
-      {/* Search & Quick Actions */}
-      <div className="mb-6 animate-fadeIn">
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-            <input
-              type="text"
-              placeholder="Rechercher une transaction..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 rounded-full bg-white border border-gray-200 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all"
+      <QueryBoundary loading={query.loading && !query.data} error={query.error} onRetry={query.refetch}>
+        <div className="space-y-6">
+          <div className="stagger stat-grid grid-cols-2 xl:grid-cols-4">
+            <StatCard info="Somme des factures payées, tous moyens de paiement confondus." label="Encaissé" badge={{ label: CASH_PERIOD_LABELS[period], tone: 'sky' }} tone="green" value={formatMoney(totals.collected)} hint="Ventes réglées sur la période" />
+            <StatCard info="Factures émises mais pas encore réglées." label="À encaisser" badge={{ label: 'À suivre', tone: 'amber' }} tone="amber" value={formatMoney(totals.pending)} hint="Factures en attente ou en retard" />
+            <StatCard info="Ventes en espèces, plus les dépôts, moins les retraits et remboursements en espèces." label="Espèces en caisse" badge={{ label: 'Tiroir', tone: 'violet' }} value={formatMoney(totals.cashBalance)} hint="Ventes en espèces et mouvements" />
+            <StatCard
+              info="Remboursements et retraits enregistrés sur la période." label="Sorties"
+              tone="red"
+              value={formatMoney(totals.refunds + totals.withdrawals)}
+              hint={`${formatMoney(totals.refunds)} remboursés, ${formatMoney(totals.withdrawals)} retirés`}
             />
           </div>
-          <button
-            onClick={() => { setFormData({ ...formData, type: 'Vente' }); setShowModal(true); }}
-            className="px-4 py-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium transition-colors flex items-center gap-2 whitespace-nowrap"
-          >
-            <Plus size={14} />
-            Nouvelle vente
-          </button>
-          <button
-            onClick={() => { setFormData({ ...formData, type: 'Remboursement' }); setShowModal(true); }}
-            className="px-4 py-3 bg-red-50 hover:bg-red-100 text-red-700 rounded-full text-xs font-medium transition-colors flex items-center gap-2 whitespace-nowrap"
-          >
-            <RefreshCcw size={14} />
-            Remboursement
-          </button>
-          <button
-            onClick={() => { setFormData({ ...formData, type: 'Dépôt' }); setShowModal(true); }}
-            className="px-4 py-3 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-full text-xs font-medium transition-colors flex items-center gap-2 whitespace-nowrap"
-          >
-            <Wallet size={14} />
-            Dépôt
-          </button>
-          <button
-            onClick={handlePrint}
-            className="px-4 py-3 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-full text-xs font-medium transition-colors flex items-center gap-2"
-            title="Imprimer le rapport"
-          >
-            <Printer size={14} />
-          </button>
-        </div>
-      </div>
 
-      {/* Analytics Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6 animate-fadeIn">
-        {/* Daily Summary */}
-        <div className="lg:col-span-2 bg-white rounded-lg border border-gray-100 p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-sm font-medium text-gray-900">Résumé du jour</h3>
-            <Calendar className="text-gray-400" size={18} />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <ArrowUpRight className="text-emerald-600" size={16} />
-                <span className="text-xs text-emerald-700 font-medium">Entrées</span>
-              </div>
-              <p className="text-2xl font-light text-emerald-900">{totalSales + totalDeposits} MAD</p>
-              <p className="text-xs text-emerald-600 mt-1">{transactions.filter(t => t.amount > 0).length} transactions</p>
-            </div>
-            <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <ArrowDownRight className="text-red-600" size={16} />
-                <span className="text-xs text-red-700 font-medium">Sorties</span>
-              </div>
-              <p className="text-2xl font-light text-red-900">{Math.abs(totalRefunds + totalWithdrawals)} MAD</p>
-              <p className="text-xs text-red-600 mt-1">{transactions.filter(t => t.amount < 0).length} transactions</p>
-            </div>
-          </div>
-          <div className="mt-4 pt-4 border-t border-gray-100">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Solde net</span>
-              <span className="text-xl font-medium text-gray-900">
-                {totalSales + totalDeposits + totalRefunds + totalWithdrawals} MAD
-              </span>
-            </div>
-          </div>
-        </div>
+          {Object.keys(totals.byMethod).length > 0 && (
+            <Card title="Encaissements par moyen de paiement">
+              <ShareBars
+                format={formatMoney}
+                items={Object.entries(totals.byMethod)
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([m, v]) => ({ label: PAYMENT_METHOD_LABELS[m as PaymentMethod] ?? m, value: v }))}
+              />
+            </Card>
+          )}
 
-        {/* Payment Methods Distribution */}
-        <div className="bg-white rounded-lg border border-gray-100 p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-sm font-medium text-gray-900">Répartition paiements</h3>
-            <Wallet className="text-gray-400" size={18} />
+          <div className="no-print flex justify-end">
+            <label className="relative block w-full max-w-sm">
+              <span className="sr-only">Rechercher</span>
+              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" />
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Client ou numéro de facture"
+                className="w-full rounded-full border border-neutral-200 py-2.5 pl-10 pr-4 text-sm focus:border-neutral-400 focus:ring-4 focus:ring-neutral-950/5 focus:outline-none"
+              />
+            </label>
           </div>
-          <div className="space-y-3">
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-gray-600">Espèces</span>
-                <span className="text-sm font-medium text-gray-900">{totalCash} MAD</span>
-              </div>
-              <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-emerald-500 rounded-full transition-all"
-                  style={{ width: `${(totalCash / totalSales) * 100}%` }}
-                />
-              </div>
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-gray-600">Carte</span>
-                <span className="text-sm font-medium text-gray-900">{totalCard} MAD</span>
-              </div>
-              <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-blue-500 rounded-full transition-all"
-                  style={{ width: `${(totalCard / totalSales) * 100}%` }}
-                />
-              </div>
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-gray-600">Virement</span>
-                <span className="text-sm font-medium text-gray-900">
-                  {transactions.filter(t => t.method === 'Virement').reduce((sum, t) => sum + t.amount, 0)} MAD
-                </span>
-              </div>
-              <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-purple-500 rounded-full transition-all"
-                  style={{ width: `${(transactions.filter(t => t.method === 'Virement').reduce((sum, t) => sum + t.amount, 0) / totalSales) * 100}%` }}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      {/* Transactions Table */}
-      <div className="bg-white rounded-lg border border-gray-100 overflow-hidden animate-fadeIn">
-        <div className="px-6 py-4 border-b border-gray-100">
-          <h3 className="text-sm font-medium text-gray-900">Toutes les transactions</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Montant</th>
-                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Méthode</th>
-                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
-                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employé</th>
-                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Note</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredTransactions.map(tx => (
-                <tr key={tx.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${
-                      tx.type === 'Vente' ? 'bg-emerald-50 text-emerald-700' :
-                      tx.type === 'Remboursement' ? 'bg-red-50 text-red-700' :
-                      tx.type === 'Dépôt' ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-700'
-                    }`}>
-                      {tx.type}
-                    </span>
+          {rows.length === 0 ? (
+            <EmptyState title="Aucune opération" description="Aucune opération ne correspond à ces filtres." />
+          ) : (
+            <Table head={['Date', 'Type', 'Libellé', 'Moyen', 'Statut', <span key="m" className="block text-right">Montant</span>, '']}>
+              {rows.map((e, index) => (
+                <tr key={`${e.kind}-${e.id}`} className={`hover:bg-neutral-50 ${pager.rowClass(index)}`}>
+                  <td className="whitespace-nowrap px-5 py-3 text-neutral-600">{formatDateTime(e.date)}</td>
+                  <td className="px-5 py-3">{LEDGER_TYPE_LABELS[e.type]}</td>
+                  <td className="px-5 py-3">
+                    <p className="font-medium text-neutral-950">{e.label || '-'}</p>
+                    {e.reference && <p className="text-xs text-neutral-400">{e.reference}</p>}
                   </td>
-                  <td className={`px-6 py-4 font-light text-lg ${tx.amount < 0 ? 'text-red-600' : 'text-gray-900'}`}>
-                    {tx.amount} MAD
+                  <td className="px-5 py-3 text-neutral-600">{paymentMethodLabel(e.method)}</td>
+                  <td className="px-5 py-3">{e.status && <Badge tone={statusTone(INVOICE_STATUS_TONES, e.status)}>{INVOICE_STATUS_LABELS[e.status]}</Badge>}</td>
+                  <td className={`whitespace-nowrap px-5 py-3 text-right font-medium tabular-nums ${e.amount < 0 ? 'text-neutral-500' : 'text-neutral-950'}`}>
+                    {e.amount < 0 ? `moins ${formatMoney(-e.amount)}` : formatMoney(e.amount)}
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      {tx.method === 'Espèces' && <Wallet size={14} className="text-gray-400" />}
-                      {tx.method === 'Carte' && <CreditCard size={14} className="text-gray-400" />}
-                      <span className="text-sm text-gray-600">{tx.method}</span>
-                    </div>
+                  <td className="no-print px-5 py-3 text-right">
+                    {e.invoice && (e.status === 'PENDING' || e.status === 'OVERDUE') && (
+                      <button
+                        type="button"
+                        onClick={() => setCollecting(e.invoice!)}
+                        className="rounded-full bg-neutral-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-800"
+                      >
+                        Encaisser
+                      </button>
+                    )}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{tx.client || '-'}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{tx.employee || '-'}</td>
-                  <td className="px-6 py-4 text-xs text-gray-400">{tx.date.toLocaleString('fr-FR')}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{tx.note || '-'}</td>
                 </tr>
               ))}
-            </tbody>
-          </table>
-        </div>
-        {filteredTransactions.length === 0 && (
-          <div className="py-12 text-center">
-            <Receipt className="mx-auto text-gray-300 mb-3" size={48} />
-                        <p className="text-gray-500">Aucune transaction trouvée</p>
+            </Table>
+          )}
+          <div className="no-print">
+            <Pagination page={pager.page} totalPages={pager.totalPages} total={pager.total} pageSize={pager.pageSize} label="opérations" onChange={pager.setPage} />
           </div>
-        )}
-      </div>
+        </div>
+      </QueryBoundary>
 
-      {/* Modal Add Transaction */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white rounded-lg shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto animate-slideUp">
-            <div className="sticky top-0 bg-white border-b border-gray-100 px-8 py-6 flex items-center justify-between">
-              <h2 className="text-2xl font-light text-gray-900">Nouvelle transaction</h2>
-              <button onClick={() => setShowModal(false)} className="p-2 text-gray-400 hover:text-gray-900 transition-colors">
-                <X size={20} />
-              </button>
-            </div>
-            <form onSubmit={handleAddTransaction} className="px-8 py-6">
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                    <Select value={formData.type} onValueChange={v => setFormData({ ...formData, type: v as any })}>
-                      <SelectTrigger className="w-full px-4 py-2.5 rounded-full bg-gray-50 border border-gray-200 text-sm mt-2">
-                        <SelectValue placeholder="Sélectionner le type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Vente">Vente</SelectItem>
-                        <SelectItem value="Remboursement">Remboursement</SelectItem>
-                        <SelectItem value="Dépôt">Dépôt</SelectItem>
-                        <SelectItem value="Retrait">Retrait</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Montant</label>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        className="px-4 py-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200"
-                        onClick={() => setFormData({ ...formData, amount: Math.max(0, Number(formData.amount) - 10) })}
-                        aria-label="Diminuer le montant"
-                      >
-                        -
-                      </button>
-                      <input
-                        type="number"
-                        value={formData.amount}
-                        onChange={e => setFormData({ ...formData, amount: Number(e.target.value) })}
-                        className="w-full px-4 py-2.5 rounded-full bg-gray-50 border border-gray-200 text-sm text-center no-arrows"
-                        required
-                        placeholder="Montant en MAD"
-                        min={0}
-                      />
-                      <button
-                        type="button"
-                        className="px-4 py-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200"
-                        onClick={() => setFormData({ ...formData, amount: Number(formData.amount) + 10 })}
-                        aria-label="Augmenter le montant"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Méthode</label>
-                    <Select value={formData.method} onValueChange={v => setFormData({ ...formData, method: v as any })}>
-                      <SelectTrigger className="w-full px-4 py-2.5 rounded-full bg-gray-50 border border-gray-200 text-sm mt-2">
-                        <SelectValue placeholder="Sélectionner la méthode" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Espèces">Espèces</SelectItem>
-                        <SelectItem value="Carte">Carte</SelectItem>
-                        <SelectItem value="Virement">Virement</SelectItem>
-                        <SelectItem value="Chèque">Chèque</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Client</label>
-                    <input type="text" value={formData.client} onChange={e => setFormData({ ...formData, client: e.target.value })} className="w-full px-4 py-2.5 rounded-full bg-gray-50 border border-gray-200 text-sm" placeholder="Nom du client" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Employé</label>
-                    <input type="text" value={formData.employee} onChange={e => setFormData({ ...formData, employee: e.target.value })} className="w-full px-4 py-2.5 rounded-full bg-gray-50 border border-gray-200 text-sm" placeholder="Nom de l'employé" />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Note</label>
-                    <input type="text" value={formData.note} onChange={e => setFormData({ ...formData, note: e.target.value })} className="w-full px-4 py-2.5 rounded-full bg-gray-50 border border-gray-200 text-sm" placeholder="Ajouter une note (optionnel)" />
-                  </div>
-                </div>
-              </div>
-              <div className="sticky bottom-0 bg-white border-t border-gray-100 -mx-8 px-8 py-4 mt-6 flex gap-3">
-                <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-6 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Annuler</button>
-                <button type="submit" className="flex-1 px-6 py-2.5 bg-[#002366] text-white text-sm font-medium rounded-full hover:bg-gray-800 transition-colors">Ajouter</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {dialog === 'sale' && <SaleDialog onClose={() => setDialog(null)} onDone={query.refetch} />}
+      {dialog === 'movement' && <MovementDialog onClose={() => setDialog(null)} onDone={query.refetch} />}
+      {collecting && <CollectDialog invoice={collecting} onClose={() => setCollecting(null)} onDone={query.refetch} />}
     </div>
   );
 }

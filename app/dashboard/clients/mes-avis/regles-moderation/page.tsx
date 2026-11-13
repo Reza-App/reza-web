@@ -1,524 +1,264 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Plus, X, Shield, Check, AlertTriangle, Star, MessageSquare, Clock, TrendingUp, ToggleLeft, ToggleRight } from 'lucide-react';
-import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
+import { useState } from 'react';
+import { Plus } from 'lucide-react';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { FormField, Modal, PrimaryButton, SecondaryButton, fieldClass } from '@/components/ui/modal';
+import { Badge, Card, PageHeader } from '@/components/ui/page';
+import { EmptyState, QueryBoundary } from '@/components/ui/states';
+import { Switch } from '@/components/ui/switch';
+import { useToast } from '@/components/ui/toast';
+import { useApiQuery } from '@/hooks/useApiQuery';
+import {
+  type ModerationAction,
+  type ModerationRule,
+  type ModerationRuleType,
+  preferencesService,
+  type TenantPreferences,
+} from '@/lib/api/services/preferences.service';
+import { errorMessage } from '@/lib/api/errors';
+import { Select } from '@/components/ui/select';
+import { IconAction } from '@/components/ui/actions';
+import { useUrlAction } from '@/hooks/useUrlAction';
 
-interface ModerationRule {
-  id: string;
-  name: string;
-  description: string;
-  type: 'keyword' | 'rating' | 'length' | 'auto-approve';
-  condition: string;
-  action: 'auto-reject' | 'flag' | 'auto-approve';
-  isActive: boolean;
-  createdDate: Date;
-  appliedCount?: number;
+const TYPE_LABELS: Record<ModerationRuleType, string> = {
+  keyword: 'Mots interdits',
+  rating: 'Note faible',
+  length: 'Commentaire trop court',
+  'auto-approve': 'Excellent avis',
+};
+
+const ACTION_LABELS: Record<ModerationAction, string> = {
+  'auto-reject': 'Refuser automatiquement',
+  flag: 'Garder pour vérification',
+  'auto-approve': 'Publier automatiquement',
+};
+
+const DEFAULT_ACTION: Record<ModerationRuleType, ModerationAction> = {
+  keyword: 'auto-reject',
+  rating: 'flag',
+  length: 'auto-reject',
+  'auto-approve': 'auto-approve',
+};
+
+function describe(rule: ModerationRule): string {
+  switch (rule.type) {
+    case 'keyword':
+      return `Contient : ${rule.keywords.join(', ') || 'aucun mot'}`;
+    case 'rating':
+      return `Note inférieure à ${rule.rating ?? 3} étoiles`;
+    case 'length':
+      return `Moins de ${rule.length ?? 10} caractères`;
+    case 'auto-approve':
+      return `${rule.rating ?? 5} étoiles ou plus et au moins ${rule.length ?? 0} caractères`;
+  }
 }
 
-export default function ReglesModerationPage() {
-  const [rules, setRules] = useState<ModerationRule[]>([]);
-  const [showModal, setShowModal] = useState(false);
-  const [editingRule, setEditingRule] = useState<ModerationRule | null>(null);
-  const [formData, setFormData] = useState({
+function newRule(): ModerationRule {
+  return {
+    id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : String(Date.now()),
     name: '',
     description: '',
-    type: 'keyword' as 'keyword' | 'rating' | 'length' | 'auto-approve',
-    condition: '',
-    action: 'flag' as 'auto-reject' | 'flag' | 'auto-approve',
+    type: 'keyword',
+    keywords: [],
+    action: 'auto-reject',
     isActive: true,
-  });
-
-  useEffect(() => {
-    const storedRules = localStorage.getItem('moderationRules');
-    if (storedRules && JSON.parse(storedRules).length > 0) {
-      const parsed = JSON.parse(storedRules).map((r: ModerationRule) => ({
-        ...r,
-        createdDate: new Date(r.createdDate),
-      }));
-      setRules(parsed);
-    } else {
-      const sampleRules: ModerationRule[] = [
-        {
-          id: '1',
-          name: 'Langage inapproprié',
-          description: 'Bloque automatiquement les avis contenant des insultes ou propos offensants',
-          type: 'keyword',
-          condition: 'nul, horrible, arnaque',
-          action: 'auto-reject',
-          isActive: true,
-          createdDate: new Date('2024-01-15'),
-          appliedCount: 12,
-        },
-        {
-          id: '2',
-          name: 'Notes faibles',
-          description: 'Signale les avis avec moins de 3 étoiles pour révision manuelle',
-          type: 'rating',
-          condition: '< 3 étoiles',
-          action: 'flag',
-          isActive: true,
-          createdDate: new Date('2024-01-10'),
-          appliedCount: 28,
-        },
-        {
-          id: '3',
-          name: 'Avis trop courts',
-          description: 'Rejette les commentaires de moins de 10 caractères',
-          type: 'length',
-          condition: '< 10 caractères',
-          action: 'auto-reject',
-          isActive: true,
-          createdDate: new Date('2024-01-05'),
-          appliedCount: 5,
-        },
-        {
-          id: '4',
-          name: 'Validation 5 étoiles',
-          description: 'Approuve automatiquement les excellents avis détaillés',
-          type: 'auto-approve',
-          condition: '5 étoiles + > 50 caractères',
-          action: 'auto-approve',
-          isActive: false,
-          createdDate: new Date('2024-01-20'),
-          appliedCount: 0,
-        },
-      ];
-      localStorage.setItem('moderationRules', JSON.stringify(sampleRules));
-      setRules(sampleRules);
-    }
-  }, []);
-
-  const activeRulesCount = rules.filter(r => r.isActive).length;
-  const totalApplied = rules.reduce((sum, r) => sum + (r.appliedCount || 0), 0);
-
-  const handleAddRule = () => {
-    setEditingRule(null);
-    setFormData({
-      name: '',
-      description: '',
-      type: 'keyword',
-      condition: '',
-      action: 'flag',
-      isActive: true,
-    });
-    setShowModal(true);
   };
+}
 
-  const handleEditRule = (rule: ModerationRule) => {
-    setEditingRule(rule);
-    setFormData({
-      name: rule.name,
-      description: rule.description,
-      type: rule.type,
-      condition: rule.condition,
-      action: rule.action,
-      isActive: rule.isActive,
-    });
-    setShowModal(true);
-  };
+function RuleDialog({ rule, onClose, onSave }: { rule: ModerationRule; onClose: () => void; onSave: (rule: ModerationRule) => Promise<void> }) {
+  const [draft, setDraft] = useState(rule);
+  const [keywords, setKeywords] = useState(rule.keywords.join(', '));
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const toggleRuleStatus = (id: string) => {
-    const updatedRules = rules.map(r =>
-      r.id === id ? { ...r, isActive: !r.isActive } : r
-    );
-    setRules(updatedRules);
-    localStorage.setItem('moderationRules', JSON.stringify(updatedRules));
-  };
+  const setType = (type: ModerationRuleType) =>
+    setDraft((d) => ({
+      ...d,
+      type,
+      action: DEFAULT_ACTION[type],
+      rating: type === 'rating' ? 3 : type === 'auto-approve' ? 5 : undefined,
+      length: type === 'length' ? 10 : type === 'auto-approve' ? 50 : undefined,
+    }));
 
-  const handleSubmit = () => {
-    if (!formData.name || !formData.description || !formData.condition) {
-      alert('Veuillez remplir tous les champs');
-      return;
-    }
-
-    if (editingRule) {
-      const updatedRules = rules.map(r =>
-        r.id === editingRule.id ? { ...editingRule, ...formData } : r
-      );
-      setRules(updatedRules);
-      localStorage.setItem('moderationRules', JSON.stringify(updatedRules));
-    } else {
-      const newRule: ModerationRule = {
-        id: Date.now().toString(),
-        ...formData,
-        createdDate: new Date(),
-        appliedCount: 0,
-      };
-      const updatedRules = [...rules, newRule];
-      setRules(updatedRules);
-      localStorage.setItem('moderationRules', JSON.stringify(updatedRules));
-    }
-    setShowModal(false);
-  };
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'keyword': return <MessageSquare size={16} />;
-      case 'rating': return <Star size={16} />;
-      case 'length': return <Clock size={16} />;
-      case 'auto-approve': return <Check size={16} />;
-      default: return <Shield size={16} />;
-    }
-  };
-
-  const getActionColor = (action: string) => {
-    switch (action) {
-      case 'auto-reject': return 'text-red-600';
-      case 'flag': return 'text-amber-600';
-      case 'auto-approve': return 'text-emerald-600';
-      default: return 'text-gray-600';
+  const submit = async () => {
+    const words = keywords.split(',').map((k) => k.trim()).filter(Boolean);
+    if (!draft.name.trim()) return setError('Donnez un nom à la règle.');
+    if (draft.type === 'keyword' && words.length === 0) return setError('Ajoutez au moins un mot.');
+    setBusy(true);
+    try {
+      await onSave({ ...draft, name: draft.name.trim(), keywords: draft.type === 'keyword' ? words : [] });
+      onClose();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
     }
   };
 
   return (
-    <div className="min-h-screen">
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes slideUp {
-          from { transform: translateY(20px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        .animate-fadeIn { animation: fadeIn 0.2s ease-out; }
-        .animate-slideUp { animation: slideUp 0.3s ease-out; }
-      `}</style>
-
-      {/* Header */}
-      <div className="mb-8 pt-20 animate-slideUp">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-5xl font-light text-black tracking-tight mb-2">Modération</h1>
-            <p className="text-sm text-gray-400">Gérez les règles de validation des avis clients</p>
-          </div>
-          <button
-            onClick={handleAddRule}
-            className="px-5 py-2 bg-[#002366] text-white text-sm font-medium rounded-full hover:bg-[#001a4d] transition-colors flex items-center gap-2"
-          >
-            Nouvelle règle
-            <Plus size={16} />
-          </button>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-6 mb-8 animate-fadeIn">
-        <div className="bg-white rounded-lg border border-gray-100 p-6">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Règles actives</span>
-            <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center">
-              <Shield className="text-emerald-600" size={16} />
-            </div>
-          </div>
-          <p className="text-3xl font-light text-black">{activeRulesCount}</p>
-        </div>
-
-        <div className="bg-white rounded-lg border border-gray-100 p-6">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Total règles</span>
-            <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center">
-              <TrendingUp className="text-blue-600" size={16} />
-            </div>
-          </div>
-          <p className="text-3xl font-light text-black">{rules.length}</p>
-        </div>
-
-        <div className="bg-white rounded-lg border border-gray-100 p-6">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Avis traités</span>
-            <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center">
-              <Check className="text-gray-600" size={16} />
-            </div>
-          </div>
-          <p className="text-3xl font-light text-black">{totalApplied}</p>
-        </div>
-      </div>
-
-      {/* Rules List */}
-      <div className="space-y-3 mb-12 animate-fadeIn">
-        {rules.map((rule) => (
-          <div
-            key={rule.id}
-            className="bg-white rounded-lg border border-gray-100 hover:shadow-lg hover:border-gray-200 transition-all group"
-          >
-            <div className="p-6">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      rule.isActive ? 'bg-[#002366]' : 'bg-gray-100'
-                    }`}>
-                      <span className={rule.isActive ? 'text-white' : 'text-gray-400'}>
-                        {getTypeIcon(rule.type)}
-                      </span>
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-medium text-black mb-1">{rule.name}</h3>
-                      <p className="text-sm text-gray-500">{rule.description}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-4 ml-13 mt-4">
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-gray-400">Condition:</span>
-                      <span className="font-medium text-gray-700">{rule.condition}</span>
-                    </div>
-                    <div className="h-3 w-px bg-gray-200"></div>
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-gray-400">Action:</span>
-                      <span className={`font-medium ${getActionColor(rule.action)}`}>
-                        {rule.action === 'auto-reject' && 'Rejet auto'}
-                        {rule.action === 'flag' && 'Signaler'}
-                        {rule.action === 'auto-approve' && 'Approuver auto'}
-                      </span>
-                    </div>
-                    {rule.appliedCount !== undefined && (
-                      <>
-                        <div className="h-3 w-px bg-gray-200"></div>
-                        <div className="flex items-center gap-2 text-xs text-gray-400">
-                          <span>{rule.appliedCount} fois appliquée</span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 ml-4">
-                  <button
-                    onClick={() => toggleRuleStatus(rule.id)}
-                    className={`p-2 rounded-md transition-all ${
-                      rule.isActive
-                        ? 'text-[#002366] hover:bg-gray-100'
-                        : 'text-gray-400 hover:bg-gray-50'
-                    }`}
-                    title={rule.isActive ? 'Désactiver' : 'Activer'}
-                  >
-                    {rule.isActive ? <ToggleLeft size={18} /> : <ToggleRight size={18} />}
-                  </button>
-                  <button
-                    onClick={() => handleEditRule(rule)}
-                    className="px-4 py-2 text-sm font-medium text-[#002366] hover:text-[#001a4d] transition-colors"
-                  >
-                    Modifier
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* How it Works */}
-      <div className="animate-fadeIn">
-        <div className="mb-6">
-          <h2 className="text-3xl font-light text-black tracking-tight mb-2">Comment ça fonctionne</h2>
-          <p className="text-sm text-gray-400">Le processus de modération expliqué simplement</p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Step 1 */}
-          <div className="bg-white rounded-lg border border-gray-100 p-8">
-            <div className="w-12 h-12 rounded-full bg-[#002366] flex items-center justify-center text-white text-lg font-light mb-6">
-              1
-            </div>
-            <h3 className="text-lg font-medium text-black mb-3">Le client note</h3>
-            <p className="text-sm text-gray-600 leading-relaxed mb-6">
-              Après sa prestation, le client reçoit un email pour évaluer son expérience sur 4 critères distincts.
-            </p>
-            <div className="space-y-2">
-              {['Accueil', 'Propreté', 'Cadre', 'Prestation'].map((item) => (
-                <div key={item} className="flex items-center gap-2 text-sm text-gray-700">
-                  <div className="w-1 h-1 rounded-full bg-gray-400"></div>
-                  <span>{item}</span>
-                </div>
+    <Modal
+      backLabel="Retour aux règles"
+      open
+      title={rule.name ? 'Modifier la règle' : 'Nouvelle règle'}
+      onClose={onClose}
+      busy={busy}
+      footer={
+        <>
+          <SecondaryButton onClick={onClose}>Annuler</SecondaryButton>
+          <PrimaryButton onClick={submit} busy={busy}>
+            Enregistrer
+          </PrimaryButton>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>}
+        <FormField label="Nom">
+          <input className={fieldClass} maxLength={80} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+        </FormField>
+        <FormField label="Type de règle">
+          <Select value={draft.type} onValueChange={(v) => setType(v as ModerationRuleType)}>
+            {Object.entries(TYPE_LABELS).map(([v, l]) => (
+              <option key={v} value={v}>
+                {l}
+              </option>
+            ))}
+          </Select>
+        </FormField>
+        {draft.type === 'keyword' && (
+          <FormField label="Mots interdits" hint="Séparés par des virgules. Majuscules et accents ignorés.">
+            <input className={fieldClass} value={keywords} onChange={(e) => setKeywords(e.target.value)} placeholder="arnaque, honteux" />
+          </FormField>
+        )}
+        {(draft.type === 'rating' || draft.type === 'auto-approve') && (
+          <FormField label={draft.type === 'rating' ? 'Note inférieure à' : 'Note minimale'}>
+            <Select value={draft.rating} onValueChange={(v) => setDraft({ ...draft, rating: Number(v) })}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <option key={n} value={n}>
+                  {n} étoile{n > 1 ? 's' : ''}
+                </option>
               ))}
-            </div>
-          </div>
-
-          {/* Step 2 */}
-          <div className="bg-white rounded-lg border border-gray-100 p-8">
-            <div className="w-12 h-12 rounded-full bg-[#002366] flex items-center justify-center text-white text-lg font-light mb-6">
-              2
-            </div>
-            <h3 className="text-lg font-medium text-black mb-3">Analyse automatique</h3>
-            <p className="text-sm text-gray-600 leading-relaxed mb-6">
-              Les règles de modération analysent l'avis en temps réel selon vos critères configurés.
-            </p>
-            <div className="space-y-3">
-              <div className="flex items-start gap-2">
-                <Check className="text-emerald-600 shrink-0 mt-0.5" size={16} />
-                <span className="text-sm text-gray-700">Validation immédiate si conforme</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={16} />
-                <span className="text-sm text-gray-700">Signalement si critère détecté</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <X className="text-red-600 shrink-0 mt-0.5" size={16} />
-                <span className="text-sm text-gray-700">Rejet si non-conforme</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Step 3 */}
-          <div className="bg-white rounded-lg border border-gray-100 p-8">
-            <div className="w-12 h-12 rounded-full bg-[#002366] flex items-center justify-center text-white text-lg font-light mb-6">
-              3
-            </div>
-            <h3 className="text-lg font-medium text-black mb-3">Vous décidez</h3>
-            <p className="text-sm text-gray-600 leading-relaxed mb-6">
-              Vous avez 7 jours pour valider, répondre ou refuser les avis signalés. Après ce délai, traitement automatique.
-            </p>
-            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-              <p className="text-xs text-gray-500 leading-relaxed">
-                Les avis validés apparaissent sur votre page publique et impactent votre note moyenne.
-              </p>
-            </div>
-          </div>
-        </div>
+            </Select>
+          </FormField>
+        )}
+        {(draft.type === 'length' || draft.type === 'auto-approve') && (
+          <FormField label={draft.type === 'length' ? 'Moins de (caractères)' : 'Au moins (caractères)'}>
+            <input
+              className={fieldClass}
+              type="number"
+              min={0}
+              max={2000}
+              value={draft.length ?? 0}
+              onChange={(e) => setDraft({ ...draft, length: Math.max(0, Math.min(2000, Number(e.target.value) || 0)) })}
+            />
+          </FormField>
+        )}
+        <FormField label="Action">
+          <Select value={draft.action} onValueChange={(v) => setDraft({ ...draft, action: v as ModerationAction })}>
+            {Object.entries(ACTION_LABELS).map(([v, l]) => (
+              <option key={v} value={v}>
+                {l}
+              </option>
+            ))}
+          </Select>
+        </FormField>
+        <FormField label="Description (facultatif)">
+          <textarea className={fieldClass} rows={2} maxLength={300} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
+        </FormField>
       </div>
+    </Modal>
+  );
+}
 
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-slideUp">
-            <div className="sticky top-0 bg-white border-b border-gray-100 px-8 py-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-light text-black">
-                  {editingRule ? 'Modifier la règle' : 'Nouvelle règle'}
-                </h2>
-                <button 
-                  onClick={() => setShowModal(false)}
-                  className="p-2 text-gray-400 hover:text-gray-900 transition-colors"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-            </div>
+export default function ModerationRulesPage() {
+  const toast = useToast();
+  const query = useApiQuery('preferences', (signal) => preferencesService.get(signal));
+  const [editing, setEditing] = useState<ModerationRule | null>(null);
+  const [deleting, setDeleting] = useState<ModerationRule | null>(null);
+  const [busy, setBusy] = useState(false);
+  useUrlAction({ new: () => setEditing(newRule()) });
+  const rules = query.data?.moderationRules ?? [];
 
-            <div className="px-8 py-6">
-              <div className="space-y-6">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                      Nom de la règle
-                    </label>
-                    <input
-                      id="name"
-                      type="text"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full px-4 py-3 rounded-full bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                      placeholder="Ex: Langage inapproprié"
-                    />
+  const persist = async (next: ModerationRule[], message: string) => {
+    const saved = await preferencesService.save({ ...(query.data as TenantPreferences), moderationRules: next });
+    query.setData(saved);
+    toast.success(message);
+  };
+
+  const upsert = (rule: ModerationRule) =>
+    persist(rules.some((r) => r.id === rule.id) ? rules.map((r) => (r.id === rule.id ? rule : r)) : [...rules, rule], 'Règle enregistrée.');
+
+  const toggle = async (rule: ModerationRule) => {
+    try {
+      await persist(rules.map((r) => (r.id === rule.id ? { ...r, isActive: !r.isActive } : r)), rule.isActive ? 'Règle désactivée.' : 'Règle activée.');
+    } catch (error) {
+      toast.error(errorMessage(error));
+    }
+  };
+
+  const remove = async () => {
+    if (!deleting) return;
+    setBusy(true);
+    try {
+      await persist(rules.filter((r) => r.id !== deleting.id), 'Règle supprimée.');
+      setDeleting(null);
+    } catch (error) {
+      toast.error(errorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div>
+      <PageHeader
+        title="Règles de modération"
+        description="Appliquées automatiquement à chaque nouvel avis. Un refus l'emporte toujours, puis une vérification manuelle, puis une publication automatique."
+        actions={
+          <PrimaryButton onClick={() => setEditing(newRule())} disabled={!query.data}>
+            <Plus size={16} /> Nouvelle règle
+          </PrimaryButton>
+        }
+      />
+      <QueryBoundary loading={query.loading && !query.data} error={query.error} onRetry={query.refetch}>
+        {rules.length === 0 ? (
+          <EmptyState title="Aucune règle" description="Sans règle, chaque avis attend votre validation dans « Avis à modérer »." />
+        ) : (
+          <div className="grid gap-4 xl:grid-cols-2">
+            {rules.map((rule) => (
+              <Card key={rule.id}>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="font-medium text-neutral-950">{rule.name}</p>
+                    <p className="mt-1 text-sm text-neutral-600">{describe(rule)}</p>
+                    {rule.description && <p className="mt-1 text-xs text-neutral-400">{rule.description}</p>}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Badge tone="muted">{TYPE_LABELS[rule.type]}</Badge>
+                      <Badge tone={rule.action === 'auto-reject' ? 'danger' : 'neutral'}>{ACTION_LABELS[rule.action]}</Badge>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-                      Description
-                    </label>
-                    <textarea
-                      id="description"
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      rows={3}
-                      className="w-full px-4 py-3 rounded-lg bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
-                      placeholder="Décrivez le fonctionnement..."
-                    />
-                  </div>
+                  <Switch checked={rule.isActive} onChange={() => toggle(rule)} label={`Activer ${rule.name}`} />
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label htmlFor="type" className="block text-sm font-medium text-gray-700">Type</label>
-                    <Select value={formData.type} onValueChange={v => setFormData({ ...formData, type: v as any })}>
-                      <SelectTrigger id="type" className="rounded-full px-4 py-3 mt-2">
-                        <SelectValue placeholder="Sélectionner le type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="keyword">Mots-clés</SelectItem>
-                        <SelectItem value="rating">Note</SelectItem>
-                        <SelectItem value="length">Longueur</SelectItem>
-                        <SelectItem value="auto-approve">Auto-approbation</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <label htmlFor="action" className="block text-sm font-medium text-gray-700">Action</label>
-                    <Select value={formData.action} onValueChange={v => setFormData({ ...formData, action: v as any })}>
-                      <SelectTrigger id="action" className="rounded-full px-4 py-3 mt-2">
-                        <SelectValue placeholder="Sélectionner l'action" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="auto-reject">Rejet automatique</SelectItem>
-                        <SelectItem value="flag">Signalement</SelectItem>
-                        <SelectItem value="auto-approve">Approbation auto</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="mt-4 flex justify-end gap-1.5 border-t border-neutral-100 pt-3">
+                  <IconAction kind="edit" label={`Modifier ${rule.name}`} onClick={() => setEditing(rule)} />
+                  <IconAction kind="delete" label={`Supprimer ${rule.name}`} onClick={() => setDeleting(rule)} />
                 </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="condition" className="block text-sm font-medium text-gray-700">
-                    Condition
-                  </label>
-                  <input
-                    id="condition"
-                    type="text"
-                    value={formData.condition}
-                    onChange={(e) => setFormData({ ...formData, condition: e.target.value })}
-                    className="w-full px-4 py-3 rounded-full bg-gray-50 border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                    placeholder="Ex: nul, horrible, arnaque"
-                  />
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, isActive: true })}
-                    className={`flex-1 px-4 py-3 rounded-full text-sm font-medium transition-all ${
-                      formData.isActive
-                       ? 'bg-emerald-50 text-emerald-700' 
-                              : 'bg-gray-100 text-gray-600'
-                    }`}
-                  >
-                    Active
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, isActive: false })}
-                    className={`flex-1 px-4 py-3 rounded-full text-sm font-medium transition-all ${
-                      !formData.isActive
-                         ? 'bg-red-50 text-red-700' 
-                              : 'bg-gray-50 text-gray-600'
-                    }`}
-                  >
-                    Inactive
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex gap-3 mt-8">
-                <button 
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 px-6 py-3 text-sm font-medium text-[#002366] hover:text-[#001a4d] transition-colors"
-                >
-                  Annuler
-                </button>
-                <button 
-                  type="button"
-                  onClick={handleSubmit}
-                  className="flex-1 px-6 py-3 bg-[#002366] text-white text-sm font-medium rounded-full hover:bg-[#001a4d] transition-colors"
-                >
-                  {editingRule ? 'Mettre à jour' : 'Créer'}
-                </button>
-              </div>
-            </div>
+              </Card>
+            ))}
           </div>
-        </div>
-      )}
+        )}
+      </QueryBoundary>
+      {editing && <RuleDialog rule={editing} onClose={() => setEditing(null)} onSave={upsert} />}
+      <ConfirmDialog
+        open={!!deleting}
+        title="Supprimer cette règle ?"
+        confirmLabel="Supprimer"
+        destructive
+        busy={busy}
+        onConfirm={remove}
+        onCancel={() => setDeleting(null)}
+      />
     </div>
   );
 }

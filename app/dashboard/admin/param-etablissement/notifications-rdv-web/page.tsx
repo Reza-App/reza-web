@@ -1,113 +1,102 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Check, Mail, Trash2, Plus } from 'lucide-react';
+import { useState } from 'react';
+import { Plus, X } from 'lucide-react';
+import { fieldClass, SecondaryButton } from '@/components/ui/modal';
+import { Card, PageHeader } from '@/components/ui/page';
+import { SaveActions, ToggleRow } from '@/components/ui/settings';
+import { QueryBoundary } from '@/components/ui/states';
+import { useSettingsForm } from '@/hooks/useSettingsForm';
+import { tenantService } from '@/lib/api/services/tenant.service';
+import { isValidEmail, messages } from '@/lib/validation';
 
-const NotificationRDVPage = () => {
-  const [emails, setEmails] = useState(['nailly.contact@gmail.com']);
-  const [newEmail, setNewEmail] = useState('');
-  const [showSuccess, setShowSuccess] = useState(false);
+/** The backend caps the recipients at five addresses. */
+const MAX_EMAILS = 5;
 
-  const handleAddEmail = () => {
-    if (newEmail && !emails.includes(newEmail)) {
-      setEmails([...emails, newEmail]);
-      setNewEmail('');
-      setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 2000);
-    }
-  };
+interface NotificationSettings {
+  emails: string[];
+  autoConfirm: boolean;
+}
 
-  const handleDeleteEmail = (email: string) => {
-    setEmails(emails.filter(e => e !== email));
-    setShowSuccess(true);
-    setTimeout(() => setShowSuccess(false), 2000);
+export default function OnlineBookingNotificationsPage() {
+  const form = useSettingsForm<NotificationSettings>(
+    'booking-notifications',
+    async (signal) => {
+      const [emails, autoConfirm] = await Promise.all([tenantService.notificationEmails(signal), tenantService.autoConfirm(signal)]);
+      return { emails, autoConfirm };
+    },
+    (draft) => Promise.all([tenantService.updateNotificationEmails(draft.emails), tenantService.setAutoConfirm(draft.autoConfirm)]),
+  );
+  const [email, setEmail] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const draft = form.draft;
+
+  const add = () => {
+    const value = email.trim().toLowerCase();
+    if (!isValidEmail(value)) return setError(messages.email);
+    if (draft?.emails.includes(value)) return setError('Cette adresse est déjà dans la liste.');
+    form.setDraft((d) => d && { ...d, emails: [...d.emails, value] });
+    setEmail('');
+    setError(null);
   };
 
   return (
-    <div className="min-h-screen p-0 md:p-0 max-w-[2000px] mx-auto">
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes slideUp {
-          from { transform: translateY(20px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        @keyframes slideDown {
-          from { transform: translateY(-20px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
-        .animate-slideUp { animation: slideUp 0.3s ease-out; }
-        .animate-slideDown { animation: slideDown 0.3s ease-out; }
-      `}</style>
-
-      {/* Success Notification */}
-      {showSuccess && (
-        <div className="fixed top-6 right-6 bg-green-400 text-white px-6 py-3 rounded shadow-lg z-50 flex items-center gap-3 animate-fadeIn">
-          <Check size={20} />
-          <span className="font-medium">Modifications enregistrées avec succès</span>
-        </div>
-      )}
-
-      {/* Header */}
-      <div className="mb-8 animate-slideDown mt-20">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-4xl md:text-5xl font-light text-gray-900 tracking-tight mb-2">
-              Notifications RDV
-            </h1>
-            <p className="text-sm text-gray-500">
-              Recevez un email dès qu'un rendez-vous est pris ou annulé en ligne
-            </p>
+    <div>
+      <PageHeader
+        title="Notifications des réservations en ligne"
+        description="Qui est prévenu quand un client réserve, et comment les réservations sont validées."
+        actions={<SaveActions dirty={form.dirty} saving={form.saving} onSave={form.submit} onReset={form.reset} />}
+      />
+      <QueryBoundary loading={!draft} error={form.query.error} onRetry={form.query.refetch}>
+        {draft && (
+          <div className="grid gap-6 xl:grid-cols-2">
+            <Card title="Validation">
+              <ToggleRow
+                title="Confirmer automatiquement"
+                description="Les réservations en ligne sont confirmées sans action de votre part. Sinon elles restent en attente dans l'agenda."
+                checked={draft.autoConfirm}
+                onChange={(autoConfirm) => form.setDraft((d) => d && { ...d, autoConfirm })}
+              />
+            </Card>
+            <Card title="Emails à prévenir">
+              <p className="mb-4 text-sm text-neutral-500">
+                Jusqu&apos;à {MAX_EMAILS} adresses reçoivent un email à chaque nouvelle réservation ou annulation.
+              </p>
+              <ul className="mb-4 space-y-2">
+                {draft.emails.map((e) => (
+                  <li key={e} className="flex items-center justify-between rounded-xl border border-neutral-200 px-4 py-2.5 text-sm">
+                    {e}
+                    <button
+                      type="button"
+                      onClick={() => form.setDraft((d) => d && { ...d, emails: d.emails.filter((x) => x !== e) })}
+                      className="rounded-full p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-950"
+                      aria-label={`Retirer ${e}`}
+                    >
+                      <X size={15} />
+                    </button>
+                  </li>
+                ))}
+                {draft.emails.length === 0 && <li className="text-sm text-neutral-400">Aucune adresse.</li>}
+              </ul>
+              {draft.emails.length < MAX_EMAILS && (
+                <form
+                  className="flex gap-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    add();
+                  }}
+                >
+                  <input className={fieldClass} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="accueil@salon.ma" aria-label="Nouvelle adresse" />
+                  <SecondaryButton type="submit">
+                    <Plus size={15} /> Ajouter
+                  </SecondaryButton>
+                </form>
+              )}
+              {error && <p className="mt-2 text-xs text-red-700">{error}</p>}
+            </Card>
           </div>
-        </div>
-      </div>
-
-      {/* Card Section */}
-      <div className="max-w-6xl mx-auto animate-fadeIn p-0">
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Ajouter une adresse email</label>
-          <div className="flex gap-2">
-            <input
-              type="email"
-              value={newEmail}
-              onChange={e => setNewEmail(e.target.value)}
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-[#002366]/20 focus:border-[#002366] text-sm text-gray-700 bg-gray-50"
-              placeholder="exemple@email.com"
-            />
-            <button
-              type="button"
-              onClick={handleAddEmail}
-              className="px-5 py-3 bg-[#002366] text-white text-sm font-medium rounded-full hover:bg-gray-800 transition-colors flex items-center gap-2"
-            >
-              <Plus size={16} />
-              Ajouter
-            </button>
-          </div>
-        </div>
-        <div className="space-y-3">
-          {emails.map(email => (
-            <div key={email} className="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-full px-5 py-3">
-              <div className="flex items-center gap-2">
-                <Mail size={16} className="text-gray-400" />
-                <span className="text-sm text-gray-900 font-medium">{email}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleDeleteEmail(email)}
-                className="px-3 py-1 text-sm text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors flex items-center gap-1"
-              >
-                <Trash2 size={16} />
-                Supprimer
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
+        )}
+      </QueryBoundary>
     </div>
   );
-};
-
-export default NotificationRDVPage;
+}

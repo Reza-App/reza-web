@@ -1,58 +1,34 @@
 'use client';
 
-import React, { useState } from 'react';
+import { Card, PageHeader } from '@/components/ui/page';
+import { SaveActions, ToggleRow } from '@/components/ui/settings';
+import { QueryBoundary } from '@/components/ui/states';
+import { useSettingsForm } from '@/hooks/useSettingsForm';
+import { preferencesService } from '@/lib/api/services/preferences.service';
 
-const GestionListeAttentePage = () => {
-  const [activation, setActivation] = useState('non');
+export default function WaitingListPage() {
+  const form = useSettingsForm('preferences', (s) => preferencesService.get(s), preferencesService.save);
+  const waitingList = form.draft?.waitingList;
 
   return (
-    <div className="min-h-screen p-0 md:p-0">
-      {/* Header */}
-      <div className="mb-8 animate-slideDown mt-20">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-4xl md:text-5xl font-light text-gray-900 tracking-tight mb-2">
-              Activation de la liste d'attente
-            </h1>
-            <p className="text-sm text-gray-500">
-              Souhaitez-vous activer la liste d'attente ?
-            </p>
-          </div>
-          <button className="px-6 py-3 bg-[#002366] text-white text-sm font-medium rounded-full hover:bg-gray-800 transition-all flex items-center gap-2">
-            Enregistrer
-          </button>
-        </div>
-      </div>
-
-      {/* Activation Options */}
-      <div className="mb-8">
-        <div className="flex flex-col gap-4">
-          <label className="flex items-center gap-2 text-gray-700 text-sm">
-            <input
-              type="radio"
-              name="activation"
-              value="oui"
-              checked={activation === 'oui'}
-              onChange={() => setActivation('oui')}
-              className="h-4 w-4 accent-[#002366]"
+    <div>
+      <PageHeader
+        title="Liste d'attente"
+        description="Quand un créneau est complet, vos clients peuvent s'inscrire pour être prévenus si une place se libère."
+        actions={<SaveActions dirty={form.dirty} saving={form.saving} onSave={form.submit} onReset={form.reset} />}
+      />
+      <QueryBoundary loading={!waitingList} error={form.query.error} onRetry={form.query.refetch}>
+        {waitingList && (
+          <Card>
+            <ToggleRow
+              title="Activer la liste d'attente"
+              description="Proposée sur votre page de réservation lorsque aucun créneau n'est disponible."
+              checked={waitingList.enabled}
+              onChange={(enabled) => form.setDraft((d) => d && { ...d, waitingList: { enabled } })}
             />
-            Oui
-          </label>
-          <label className="flex items-center gap-2 text-gray-700 text-sm">
-            <input
-              type="radio"
-              name="activation"
-              value="non"
-              checked={activation === 'non'}
-              onChange={() => setActivation('non')}
-              className="h-4 w-4 accent-[#002366]"
-            />
-            Non
-          </label>
-        </div>
-      </div>
+          </Card>
+        )}
+      </QueryBoundary>
     </div>
   );
-};
-
-export default GestionListeAttentePage;
+}
