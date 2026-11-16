@@ -207,7 +207,6 @@ export function ReviewList({ status }: { status: ReviewStatus }) {
       </QueryBoundary>
 
       <Modal
-        backLabel="Retour aux avis"
         open={!!rejecting}
         size="sm"
         title="Refuser cet avis"

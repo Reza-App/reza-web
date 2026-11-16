@@ -71,14 +71,17 @@ export function InfoTip({ text }: { text: string }) {
 
 export type StatTone = 'default' | 'green' | 'amber' | 'red' | 'violet' | 'sky';
 
+/** Stat cards stay black and white whatever their meaning. */
 const VALUE_TONE: Record<StatTone, string> = {
   default: 'text-neutral-950',
-  green: 'text-emerald-700',
-  amber: 'text-amber-600',
-  red: 'text-red-600',
-  violet: 'text-violet-700',
-  sky: 'text-sky-700',
+  green: 'text-neutral-950',
+  amber: 'text-neutral-950',
+  red: 'text-neutral-950',
+  violet: 'text-neutral-950',
+  sky: 'text-neutral-950',
 };
+
+const STAT_BADGE = 'border border-neutral-200 bg-white text-neutral-600';
 
 const BADGE_TONE: Record<Exclude<StatTone, 'default'>, string> = {
   green: 'bg-emerald-50 text-emerald-700',
@@ -133,7 +136,7 @@ export function StatCard({
         <div className="flex min-h-6 min-w-0 flex-wrap items-center gap-2">
           <p className="text-xs font-semibold uppercase tracking-[0.06em] text-neutral-500">{label}</p>
           {badge && (
-            <span className={`rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${BADGE_TONE[badge.tone]}`}>{badge.label}</span>
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${STAT_BADGE}`}>{badge.label}</span>
           )}
         </div>
         {info && (

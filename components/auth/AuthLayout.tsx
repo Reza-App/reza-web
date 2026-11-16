@@ -1,17 +1,17 @@
 import { Logo } from '@/components/brand/Logo';
-import { AuthCarousel } from './AuthCarousel';
+import { AuthCarousel, CLIENT_SLIDES } from './AuthCarousel';
 
 /** Split screen used by every account page: brand photos and form. */
-export function AuthLayout({ children }: { children: React.ReactNode }) {
+export function AuthLayout({ children, audience = 'pro' }: { children: React.ReactNode; audience?: 'pro' | 'client' }) {
   return (
     <main className="grid min-h-screen bg-white lg:grid-cols-[1.1fr_1fr]">
       <div className="lg:sticky lg:top-0 lg:h-screen">
-        <AuthCarousel />
+        <AuthCarousel slides={audience === 'client' ? CLIENT_SLIDES : undefined} />
       </div>
       <section className="flex items-center justify-center px-6 py-12 sm:px-12">
         <div className="w-full max-w-md">
           <div className="mb-10">
-            <Logo variant="pro" height={44} priority />
+            <Logo variant={audience === 'client' ? 'black' : 'pro'} height={44} priority />
           </div>
           {children}
         </div>

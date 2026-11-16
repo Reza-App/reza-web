@@ -3,7 +3,15 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 
-const SLIDES = [
+export interface AuthSlide {
+  src: string;
+  position: string;
+  alt: string;
+  title: string;
+  text: string;
+}
+
+export const PRO_SLIDES: AuthSlide[] = [
   {
     src: '/Images/auth/Salon Selia1.png',
     /** Wide photo: the caption sits top left, so frame the chairs and mirrors. */
@@ -28,10 +36,18 @@ const SLIDES = [
   },
 ];
 
+/** Same photos, told to the people who book. */
+export const CLIENT_SLIDES: AuthSlide[] = [
+  { ...PRO_SLIDES[0]!, title: 'Votre salon, en quelques clics.', text: 'Trouvez un salon près de chez vous et réservez à toute heure.' },
+  { ...PRO_SLIDES[1]!, title: 'Un moment rien que pour vous.', text: 'Choisissez la prestation, le professionnel et le créneau.' },
+  { ...PRO_SLIDES[2]!, title: 'Tous vos rendez vous au même endroit.', text: 'Modifiez, annulez, réservez pour vos proches.' },
+];
+
 const INTERVAL_MS = 6000;
 
 /** Brand photos of the sign in page, cross fading on their own. */
-export function AuthCarousel() {
+export function AuthCarousel({ slides = PRO_SLIDES }: { slides?: AuthSlide[] }) {
+  const SLIDES = slides;
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
 

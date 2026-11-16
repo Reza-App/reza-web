@@ -7,6 +7,7 @@ import { LoadingState } from '@/components/ui/states';
 import { PagePanelHost } from './PagePanelHost';
 import { RouteGuard } from './RouteGuard';
 import { Sidebar } from './Sidebar';
+import { SidebarRail } from './SidebarRail';
 import { Topbar } from './Topbar';
 
 /**
@@ -74,16 +75,19 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-white">
+      {/* Desktop column: full sidebar, or a rail of icons once folded. */}
       <div
-        className={`sticky top-0 hidden h-screen shrink-0 self-start overflow-hidden transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:block ${
-          collapsed ? 'w-0' : 'w-[264px]'
+        className={`sticky top-0 z-30 hidden h-screen shrink-0 self-start transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:block ${
+          collapsed ? 'w-[76px]' : 'w-[264px] overflow-hidden'
         }`}
-        aria-hidden={collapsed}
-        inert={collapsed}
       >
-        <div className="w-[264px]">
-          <Sidebar onCollapse={() => writeCollapsed(true)} />
-        </div>
+        {collapsed ? (
+          <SidebarRail onExpand={() => writeCollapsed(false)} />
+        ) : (
+          <div className="w-[264px]">
+            <Sidebar onCollapse={() => writeCollapsed(true)} />
+          </div>
+        )}
       </div>
 
       {drawerOpen && (
@@ -101,7 +105,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar onOpenMenu={openMenu} menuOnDesktop={collapsed} />
+        <Topbar onOpenMenu={openMenu} />
         <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:p-8">
           <ClientOnly fallback={<LoadingState />}>
             <PagePanelHost>

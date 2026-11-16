@@ -222,3 +222,12 @@
 @media print {
   .no-print { display: none !important; }
 }
+
+/* Horizontal rows (categories, days): scroll by swipe, wheel or arrows, no bar. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

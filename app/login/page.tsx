@@ -115,6 +115,14 @@ function LoginForm({ onForgot }: { onForgot: () => void }) {
               Renvoyer le lien
             </button>
           )}
+          {!unverified && (
+            <span className="mt-1 block">
+              Vous êtes client ?{' '}
+              <a href="/client/connexion" className="font-semibold underline">
+                Connectez vous à l&apos;espace client
+              </a>
+            </span>
+          )}
         </FormAlert>
       )}
       {info && <FormAlert tone="success">{info}</FormAlert>}
@@ -334,6 +342,12 @@ function LoginScreen() {
           </button>
         </p>
       )}
+      <p className="mt-3 text-center text-xs text-neutral-400">
+        Vous souhaitez réserver un rendez vous ?{' '}
+        <a href="/client/connexion" className="underline hover:text-neutral-700">
+          Espace client
+        </a>
+      </p>
     </AuthLayout>
   );
 }

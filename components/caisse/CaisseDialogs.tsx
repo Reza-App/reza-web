@@ -82,7 +82,6 @@ export function SaleDialog({ onClose, onDone }: { onClose: () => void; onDone: (
 
   return (
     <Modal
-      backLabel="Retour à la caisse"
       open
       size="lg"
       title="Nouvelle vente"
@@ -167,7 +166,6 @@ export function MovementDialog({ onClose, onDone }: { onClose: () => void; onDon
 
   return (
     <Modal
-      backLabel="Retour à la caisse"
       open
       size="sm"
       title="Mouvement de caisse"
@@ -229,7 +227,6 @@ export function CollectDialog({ invoice, onClose, onDone }: { invoice: Invoice; 
 
   return (
     <Modal
-      backLabel="Retour à la caisse"
       open
       size="sm"
       title={`Encaisser ${invoice.invoiceNumber}`}

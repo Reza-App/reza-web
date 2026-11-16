@@ -33,7 +33,9 @@ export interface Appointment {
   id: string;
   tenantId: string;
   clientId: string;
-  client?: (PersonRef & { email?: string | null; phone?: string | null }) | null;
+  client?: (PersonRef & { email?: string | null; phone?: string | null; isWalkIn?: boolean }) | null;
+  /** Name typed for a walk in client (no client file). */
+  walkInName?: string | null;
   employee?: PersonRef | null;
   startTime: string;
   endTime: string;
@@ -55,7 +57,9 @@ export interface AppointmentServiceInput {
 }
 
 export interface CreateAppointmentInput {
-  clientId: string;
+  /** A client file, or walkInName for a walk in client without file. */
+  clientId?: string;
+  walkInName?: string;
   services: AppointmentServiceInput[];
   employeeId?: string;
   startTime: string;
@@ -86,4 +90,15 @@ export function statusLabel(status: string): string {
 /** Service names of an appointment, joined for display. */
 export function serviceSummary(appointment: Pick<Appointment, 'services'>): string {
   return appointment.services.map((s) => s.name).join(', ');
+}
+
+/** Name shown for an appointment: the walk in name, else the client file. */
+export function appointmentClientName(a: Pick<Appointment, 'walkInName' | 'client'>): string {
+  if (a.walkInName?.trim()) return a.walkInName.trim();
+  return [a.client?.firstName, a.client?.lastName].filter(Boolean).join(' ').trim();
+}
+
+/** Walk in appointments have no reachable client (no phone, no email). */
+export function isWalkInAppointment(a: Pick<Appointment, 'walkInName' | 'client'>): boolean {
+  return Boolean(a.walkInName) || Boolean(a.client?.isWalkIn);
 }

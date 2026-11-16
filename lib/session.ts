@@ -48,6 +48,31 @@ export function readTokenRole(token: string | undefined): string | null {
   }
 }
 
+/** Unverified claims of a JWT (routing and display only, never authorization). */
+export function readTokenClaims(token: string | undefined): Record<string, unknown> | null {
+  if (!token) return null;
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    const claims: unknown = JSON.parse(decodeBase64Url(parts[1]));
+    return claims && typeof claims === 'object' ? (claims as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Client (app user) session, kept apart from the salon team session. */
+export const CLIENT_SESSION_COOKIE = 'selia_client';
+export const CLIENT_HOME = '/client';
+export const CLIENT_LOGIN = '/client/connexion';
+
+/** Email of a client token, used to address the /client/:email API routes. */
+export function readClientEmail(token: string | undefined): string | null {
+  const claims = readTokenClaims(token);
+  if (!claims || claims.role !== 'CLIENT' || typeof claims.email !== 'string') return null;
+  return claims.email.toLowerCase();
+}
+
 /** Platform administrators work in /plateforme, salons in /dashboard. */
 export const PLATFORM_HOME = '/plateforme';
 export const SALON_HOME = '/dashboard/rendez-vous';

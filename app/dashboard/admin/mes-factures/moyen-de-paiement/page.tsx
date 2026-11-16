@@ -43,7 +43,6 @@ function TransferDialog({ amount, onClose, onDone }: { amount: number; onClose: 
 
   return (
     <Modal
-      backLabel="Retour à l'abonnement"
       open
       size="sm"
       title="Déclarer un virement"

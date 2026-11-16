@@ -1,7 +1,7 @@
 'use client';
 
-import { personName, toTimeLabel } from '@/lib/format';
-import { type Appointment, serviceSummary, statusLabel } from '@/lib/types/appointment';
+import { toTimeLabel } from '@/lib/format';
+import { type Appointment, appointmentClientName, serviceSummary, statusLabel } from '@/lib/types/appointment';
 import type { AppointmentDisplaySettings, DisplayField } from '@/lib/types/tenant';
 
 const DEFAULT_FIELDS: DisplayField[] = [
@@ -69,7 +69,7 @@ export function AppointmentCard({
       case 'clientName':
         return (
           <p key="client" className="truncate font-semibold">
-            {personName(appointment.client) || 'Client'}
+            {appointmentClientName(appointment) || 'Client'}
           </p>
         );
       case 'services':
@@ -98,7 +98,7 @@ export function AppointmentCard({
         e.dataTransfer.effectAllowed = 'move';
       }}
       onClick={() => onOpen(appointment)}
-      title={`${personName(appointment.client)} : ${serviceSummary(appointment)} (${statusLabel(appointment.status)})`}
+      title={`${appointmentClientName(appointment)} : ${serviceSummary(appointment)} (${statusLabel(appointment.status)})`}
       style={{ ...colorStyle, ...style }}
       className={`flex w-full flex-col items-stretch justify-start overflow-hidden rounded-lg border px-2 py-1 text-left text-xs leading-snug shadow-sm transition hover:shadow-md ${
         colorStyle ? 'text-neutral-950' : STATUS_STYLE[appointment.status] ?? STATUS_STYLE.CONFIRMED
@@ -106,7 +106,7 @@ export function AppointmentCard({
     >
       {compact ? (
         <span className="block truncate">
-          <span className="tabular-nums opacity-70">{toTimeLabel(start)}</span> {personName(appointment.client)}
+          <span className="tabular-nums opacity-70">{toTimeLabel(start)}</span> {appointmentClientName(appointment)}
         </span>
       ) : (
         fields.map(render)

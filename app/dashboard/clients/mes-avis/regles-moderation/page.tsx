@@ -98,7 +98,6 @@ function RuleDialog({ rule, onClose, onSave }: { rule: ModerationRule; onClose: 
 
   return (
     <Modal
-      backLabel="Retour aux règles"
       open
       title={rule.name ? 'Modifier la règle' : 'Nouvelle règle'}
       onClose={onClose}

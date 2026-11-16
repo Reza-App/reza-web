@@ -97,7 +97,6 @@ export function EmployeeFormDialog({
 
   return (
     <Modal
-      backLabel="Retour aux agendas"
       open
       size="lg"
       title={employee ? 'Modifier le collaborateur' : 'Nouveau collaborateur'}

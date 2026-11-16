@@ -10,13 +10,15 @@ import { Eye, Pencil, Trash2 } from 'lucide-react';
  */
 export type Tone = 'green' | 'violet' | 'sky' | 'amber' | 'red' | 'neutral';
 
+/** Black and white for every secondary action; red only for destructive ones. */
+const NEUTRAL_BUTTON = 'border border-neutral-300 bg-white text-neutral-900 hover:border-neutral-950 hover:bg-neutral-950 hover:text-white';
 const TONE_BUTTON: Record<Tone, string> = {
-  green: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
-  violet: 'bg-violet-50 text-violet-700 hover:bg-violet-100',
-  sky: 'bg-sky-50 text-sky-700 hover:bg-sky-100',
-  amber: 'bg-amber-50 text-amber-700 hover:bg-amber-100',
-  red: 'bg-red-50 text-red-700 hover:bg-red-100',
-  neutral: 'bg-neutral-100 text-neutral-800 hover:bg-neutral-200',
+  green: NEUTRAL_BUTTON,
+  violet: NEUTRAL_BUTTON,
+  sky: NEUTRAL_BUTTON,
+  amber: NEUTRAL_BUTTON,
+  neutral: NEUTRAL_BUTTON,
+  red: 'border border-red-200 bg-red-50 text-red-700 hover:bg-red-600 hover:text-white',
 };
 
 /** Soft tinted header button (secondary action). */
@@ -30,7 +32,7 @@ export function ToneButton({
     <button
       type="button"
       {...props}
-      className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition duration-200 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${TONE_BUTTON[tone]} ${className ?? ''}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition duration-200 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${TONE_BUTTON[tone]} ${className ?? ''}`}
     >
       {children}
     </button>
@@ -38,12 +40,12 @@ export function ToneButton({
 }
 
 const ICON_ACTIONS = {
-  view: { icon: Eye, tone: 'bg-sky-50 text-sky-600 hover:bg-sky-100' },
-  edit: { icon: Pencil, tone: 'bg-amber-50 text-amber-600 hover:bg-amber-100' },
-  delete: { icon: Trash2, tone: 'bg-red-50 text-red-600 hover:bg-red-100' },
+  view: { icon: Eye, tone: 'border border-neutral-200 bg-white text-neutral-800 hover:border-neutral-950 hover:bg-neutral-950 hover:text-white' },
+  edit: { icon: Pencil, tone: 'border border-neutral-200 bg-white text-neutral-800 hover:border-neutral-950 hover:bg-neutral-950 hover:text-white' },
+  delete: { icon: Trash2, tone: 'border border-red-100 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white' },
 } as const;
 
-/** Small square row action: view (blue), edit (amber), delete (red). */
+/** Small round row action: view and edit in black and white, delete in red. */
 export function IconAction({
   kind,
   label,
@@ -60,7 +62,7 @@ export function IconAction({
       onClick={onClick}
       aria-label={label}
       title={label}
-      className={`flex h-9 w-9 items-center justify-center rounded-lg transition duration-200 active:scale-95 ${tone}`}
+      className={`flex h-9 w-9 items-center justify-center rounded-full transition duration-200 active:scale-95 ${tone}`}
     >
       <Icon size={16} />
     </button>

@@ -2,8 +2,8 @@
 
 import { CLIENT_STATUS_TONES, statusTone } from '@/lib/status';
 import { useState } from 'react';
-import { Copy, Download, Plus } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { Download, LayoutGrid, List, Plus } from 'lucide-react';
+import { ClientGrid } from '@/components/clients/ClientGrid';
 import { CLIENT_STATUS_LABELS, ClientFormDialog } from '@/components/clients/ClientFormDialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { IconAction, RowActions, ToneButton } from '@/components/ui/actions';
@@ -33,6 +33,8 @@ export default function ClientsPage() {
   const term = useDebounce(search.trim(), 350);
   const status = (get('status', 'all') as StatusFilter) || 'all';
   const page = Math.max(1, Number(get('page', '1')) || 1);
+  /** List or grid, kept in the URL (?vue=grille). */
+  const view = get('vue') === 'grille' ? 'grille' : 'liste';
 
   const query = useApiQuery(`clients:${term}:${status}:${page}`, (signal) =>
     clientService.list({ search: term || undefined, status, page, limit: PAGE_SIZE }, signal),
@@ -44,7 +46,6 @@ export default function ClientsPage() {
   const canAdminClients = can('clients.admin');
   const [busy, setBusy] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const router = useRouter();
   useUrlAction({ new: () => setEditing('new') });
 
   /** Exports every client matching the current filters (not only this page). */
@@ -106,11 +107,6 @@ export default function ClientsPage() {
             <ToneButton tone="green" onClick={exportCsv} disabled={exporting || total === 0}>
               <Download size={16} /> {exporting ? 'Export...' : 'Exporter'}
             </ToneButton>
-            {canAdminClients && (
-              <ToneButton tone="violet" onClick={() => router.push('/dashboard/clients/fichier-client/doublons')}>
-                <Copy size={16} /> Doublons
-              </ToneButton>
-            )}
             <PrimaryButton onClick={() => setEditing('new')}>
               <Plus size={16} /> Ajouter un client
             </PrimaryButton>
@@ -119,6 +115,26 @@ export default function ClientsPage() {
       />
 
       <ListHeader title="Liste des clients" count={query.data ? total : undefined}>
+        <div className="flex rounded-full border border-neutral-200 bg-white p-1" role="group" aria-label="Affichage">
+          {(
+            [
+              ['liste', List, 'Vue liste'],
+              ['grille', LayoutGrid, 'Vue grille'],
+            ] as const
+          ).map(([value, Icon, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => set({ vue: value === 'liste' ? null : value })}
+              aria-pressed={view === value}
+              aria-label={label}
+              title={label}
+              className={`flex h-9 w-9 items-center justify-center rounded-full transition ${view === value ? 'bg-neutral-950 text-white' : 'text-neutral-500 hover:text-neutral-950'}`}
+            >
+              <Icon size={16} />
+            </button>
+          ))}
+        </div>
         <Select
           aria-label="Statut"
           className="w-44"
@@ -135,6 +151,8 @@ export default function ClientsPage() {
       <QueryBoundary loading={query.loading && !query.data} error={query.error} onRetry={query.refetch}>
         {clients.length === 0 ? (
           <EmptyState title="Aucun client" description={term ? 'Aucun résultat pour cette recherche.' : 'Ajoutez votre premier client.'} />
+        ) : view === 'grille' ? (
+          <ClientGrid clients={clients} onEdit={setEditing} onDelete={canAdminClients ? setDeleting : undefined} />
         ) : (
           <Table head={['Client', 'Contact', 'Adresse', 'RDV', 'Client depuis', 'Statut', <span key="a" className="block text-right">Actions</span>]}>
             {clients.map((client) => (

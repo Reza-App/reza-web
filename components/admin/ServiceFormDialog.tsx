@@ -97,7 +97,6 @@ export function ServiceFormDialog({
 
   return (
     <Modal
-      backLabel="Retour aux prestations"
       open
       size="lg"
       title={service ? 'Modifier la prestation' : 'Nouvelle prestation'}

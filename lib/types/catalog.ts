@@ -47,6 +47,8 @@ export interface Service {
   abbreviation?: string | null;
   description?: string | null;
   category?: string | null;
+  /** Position inside its category. */
+  sortOrder?: number;
   color?: string | null;
   price: number;
   priceType?: PriceType;

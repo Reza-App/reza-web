@@ -27,11 +27,15 @@ function ClientPicker({
   onSelect,
   draft,
   onDraft,
+  walkIn,
+  onWalkIn,
 }: {
   selected: Client | null;
   onSelect: (client: Client | null) => void;
   draft: NewClientDraft | null;
   onDraft: (draft: NewClientDraft | null) => void;
+  walkIn: string | null;
+  onWalkIn: (name: string | null) => void;
 }) {
   if (draft) {
     const set = (key: keyof NewClientDraft) => (e: React.ChangeEvent<HTMLInputElement>) => onDraft({ ...draft, [key]: e.target.value });
@@ -57,7 +61,9 @@ function ClientPicker({
     <ClientSearch
       selected={selected}
       onSelect={onSelect}
-      autoFocus
+      walkInName={walkIn}
+      onWalkIn={(name) => onWalkIn(name)}
+      onClearWalkIn={() => onWalkIn(null)}
       onCreate={(typed) => {
         const [firstName = '', ...rest] = typed.split(/\s+/);
         onDraft({ firstName, lastName: rest.join(' '), phone: '', email: '' });
@@ -79,6 +85,8 @@ export function NewAppointmentDialog({
   const { data: catalog } = useServices();
   const [client, setClient] = useState<Client | null>(null);
   const [draft, setDraft] = useState<NewClientDraft | null>(null);
+  /** Walk in client: a name only, no client file. */
+  const [walkIn, setWalkIn] = useState<string | null>(null);
   const [serviceIds, setServiceIds] = useState<string[]>([]);
   const [date, setDate] = useState(toISODate(initialStart));
   const [time, setTime] = useState(toTimeLabel(initialStart));
@@ -107,7 +115,7 @@ export function NewAppointmentDialog({
 
   const submit = async () => {
     setError(null);
-    if (!client && !draft) return setError('Choisissez ou créez un client.');
+    if (!client && !draft && !walkIn) return setError('Choisissez un client, créez en un ou saisissez un client de passage.');
     if (draft) {
       if (!draft.firstName.trim() || !draft.lastName.trim()) return setError('Le prénom et le nom du client sont requis.');
       if (!isValidPhone(draft.phone)) return setError(messages.phone);
@@ -119,8 +127,9 @@ export function NewAppointmentDialog({
 
     setBusy(true);
     try {
-      const clientId =
-        client?.id ??
+      const clientId = walkIn
+        ? undefined
+        : client?.id ??
         (
           await clientService.create({
             firstName: draft!.firstName.trim(),
@@ -137,6 +146,7 @@ export function NewAppointmentDialog({
 
       await appointmentService.create({
         clientId,
+        walkInName: walkIn ?? undefined,
         services: items,
         employeeId: items.find((i) => 'employeeId' in i)?.employeeId,
         startTime: start.toISOString(),
@@ -159,7 +169,6 @@ export function NewAppointmentDialog({
 
   return (
     <Modal
-      backLabel="Retour à l'agenda"
       open
       size="lg"
       title="Nouveau rendez vous"
@@ -184,7 +193,7 @@ export function NewAppointmentDialog({
         )}
 
         <FormField label="Client" group>
-          <ClientPicker selected={client} onSelect={setClient} draft={draft} onDraft={setDraft} />
+          <ClientPicker selected={client} onSelect={setClient} draft={draft} onDraft={setDraft} walkIn={walkIn} onWalkIn={setWalkIn} />
         </FormField>
 
         <div className="grid gap-4 sm:grid-cols-2">

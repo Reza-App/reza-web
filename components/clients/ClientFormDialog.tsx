@@ -94,7 +94,6 @@ export function ClientFormDialog({
 
   return (
     <Modal
-      backLabel="Retour aux clients"
       open
       title={client ? 'Modifier la fiche client' : 'Nouveau client'}
       onClose={onClose}

@@ -85,6 +85,9 @@ export const serviceCatalog = {
   remove: (id: string) => api.delete<void>(`${R}/services/${encodeURIComponent(id)}`),
   setCategories: (categories: string[]) =>
     api.put<{ categories: string[] }>(`${R}/services/categories`, { categories }),
+  /** Saves category and position of services moved by drag and drop. */
+  reorder: (items: { id: string; category: string | null; sortOrder: number }[]) =>
+    api.put<{ updated: number }>(`${R}/services/order`, { items }),
 };
 
 export const clientService = {

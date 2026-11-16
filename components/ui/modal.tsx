@@ -2,13 +2,12 @@
 
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, X } from 'lucide-react';
-import { usePagePanel } from '@/components/layout/PagePanelHost';
+import { X } from 'lucide-react';
 
 /**
- * Form container. In the dashboard a create or edit form opens as a page of
- * its own: the list is hidden, a « Retour » button leads back to it (Escape
- * too). Outside the dashboard it falls back to a dialog.
+ * Create and edit forms: a dialog over the page. Escape, the cross or a click
+ * outside closes it (not while saving). Focus moves into the dialog once,
+ * when it opens.
  */
 export function Modal({
   open,
@@ -18,7 +17,6 @@ export function Modal({
   footer,
   size = 'md',
   busy = false,
-  backLabel = 'Retour',
 }: {
   open: boolean;
   title: string;
@@ -27,61 +25,39 @@ export function Modal({
   footer?: React.ReactNode;
   size?: 'sm' | 'md' | 'lg';
   busy?: boolean;
-  /** Text of the back button when the form is shown as a page. */
-  backLabel?: string;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
-  const { slot, acquire } = usePagePanel();
 
-  // As a page: hide the list underneath while the form is open.
+  // Latest close handler and busy flag, read by the listener below without
+  // re-running effects: callers often pass an inline onClose, and re-running
+  // the focus effect on every render stole the focus from the field typed in.
+  const closeRef = useRef(onClose);
+  const busyRef = useRef(busy);
   useEffect(() => {
-    if (!open || !slot) return;
-    return acquire();
-  }, [open, slot, acquire]);
+    closeRef.current = onClose;
+    busyRef.current = busy;
+  });
 
   useEffect(() => {
     if (!open) return;
     panelRef.current?.focus({ preventScroll: true });
-    if (slot) window.scrollTo({ top: 0 });
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !busy) onClose();
+      if (event.key === 'Escape' && !busyRef.current) closeRef.current();
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, busy, onClose, slot]);
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = overflow;
+    };
+  }, [open]);
 
   if (!open) return null;
 
-  if (slot) {
-    return createPortal(
-      <section ref={panelRef} tabIndex={-1} aria-labelledby="modal-title" className="animate-fadeUp w-full outline-none">
-        <div className="mb-6 flex items-center gap-3 sm:mb-8">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={busy}
-            aria-label={backLabel}
-            title={backLabel}
-            className="group flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-neutral-200 text-neutral-700 transition duration-200 hover:border-neutral-950 hover:bg-neutral-950 hover:text-white active:scale-95 disabled:opacity-50"
-          >
-            <ArrowLeft size={18} className="transition-transform duration-200 group-hover:-translate-x-0.5" />
-          </button>
-          <h1 id="modal-title" className="text-2xl font-medium text-neutral-950 sm:text-3xl">
-            {title}
-          </h1>
-        </div>
-        <div className="rounded-2xl border border-neutral-200 bg-white">
-          <div className="px-5 py-6 sm:px-8 sm:py-7">{children}</div>
-          {footer && <div className="flex flex-wrap justify-end gap-2 border-t border-neutral-100 px-5 py-4 sm:px-8 sm:py-5">{footer}</div>}
-        </div>
-      </section>,
-      slot,
-    );
-  }
-
   const width = size === 'sm' ? 'max-w-md' : size === 'lg' ? 'max-w-3xl' : 'max-w-2xl';
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4" onMouseDown={() => !busy && onClose()}>
       <div
         ref={panelRef}
@@ -109,7 +85,8 @@ export function Modal({
         <div className="flex-1 overflow-y-auto px-7 py-6">{children}</div>
         {footer && <div className="flex justify-end gap-2 border-t border-neutral-100 px-7 py-4">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -123,7 +100,7 @@ export function PrimaryButton({
       type="button"
       {...props}
       disabled={busy || props.disabled}
-      className={`inline-flex items-center justify-center gap-2 rounded-xl bg-neutral-950 px-5 py-2.5 text-sm font-medium text-white transition duration-200 hover:bg-neutral-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${props.className ?? ''}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-full bg-neutral-950 px-5 py-2.5 text-sm font-medium text-white transition duration-200 hover:bg-neutral-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${props.className ?? ''}`}
     >
       {busy ? 'Patientez...' : children}
     </button>
@@ -135,7 +112,7 @@ export function SecondaryButton({ children, ...props }: React.ButtonHTMLAttribut
     <button
       type="button"
       {...props}
-      className={`inline-flex items-center justify-center gap-2 rounded-xl border border-neutral-200 bg-white px-5 py-2.5 text-sm font-medium text-neutral-800 transition duration-200 hover:bg-neutral-100 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${props.className ?? ''}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-full border border-neutral-200 bg-white px-5 py-2.5 text-sm font-medium text-neutral-800 transition duration-200 hover:bg-neutral-100 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${props.className ?? ''}`}
     >
       {children}
     </button>

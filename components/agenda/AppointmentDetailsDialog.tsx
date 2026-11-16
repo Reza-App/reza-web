@@ -8,7 +8,7 @@ import { useToast } from '@/components/ui/toast';
 import { appointmentService } from '@/lib/api/services/appointment.service';
 import { errorMessage } from '@/lib/api/errors';
 import { formatDuration, formatMoney, personName, toTimeLabel } from '@/lib/format';
-import { type Appointment, type AppointmentStatus, statusLabel } from '@/lib/types/appointment';
+import { type Appointment, type AppointmentStatus, appointmentClientName, isWalkInAppointment, statusLabel } from '@/lib/types/appointment';
 import { APPOINTMENT_STATUS_TONES, statusTone } from '@/lib/status';
 import { Badge } from '@/components/ui/page';
 
@@ -77,7 +77,6 @@ export function AppointmentDetailsDialog({
   return (
     <>
       <Modal
-        backLabel="Retour à l'agenda"
         open
         title="Rendez vous"
         onClose={onClose}
@@ -106,14 +105,15 @@ export function AppointmentDetailsDialog({
         <div className="space-y-6">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-lg font-medium text-neutral-950">{personName(appointment.client)}</p>
+              <p className="text-lg font-medium text-neutral-950">{appointmentClientName(appointment)}</p>
+              {isWalkInAppointment(appointment) && <p className="text-sm text-neutral-500">Client de passage, sans fiche client</p>}
               <div className="mt-2 space-y-1 text-sm text-neutral-600">
-                {appointment.client?.phone && (
+                {!isWalkInAppointment(appointment) && appointment.client?.phone && (
                   <a href={`tel:${appointment.client.phone}`} className="flex items-center gap-2 hover:text-neutral-950">
                     <Phone size={14} /> {appointment.client.phone}
                   </a>
                 )}
-                {appointment.client?.email && (
+                {!isWalkInAppointment(appointment) && appointment.client?.email && (
                   <a href={`mailto:${appointment.client.email}`} className="flex items-center gap-2 hover:text-neutral-950">
                     <Mail size={14} /> {appointment.client.email}
                   </a>
