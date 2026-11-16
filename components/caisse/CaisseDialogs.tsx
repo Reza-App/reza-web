@@ -82,6 +82,7 @@ export function SaleDialog({ onClose, onDone }: { onClose: () => void; onDone: (
 
   return (
     <Modal
+      error={error}
       open
       size="lg"
       title="Nouvelle vente"
@@ -98,7 +99,6 @@ export function SaleDialog({ onClose, onDone }: { onClose: () => void; onDone: (
       }
     >
       <div className="space-y-6">
-        {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>}
         <FormField label="Client" group>
           <ClientSearch selected={client} onSelect={setClient} autoFocus />
         </FormField>
@@ -166,6 +166,7 @@ export function MovementDialog({ onClose, onDone }: { onClose: () => void; onDon
 
   return (
     <Modal
+      error={error}
       open
       size="sm"
       title="Mouvement de caisse"
@@ -181,7 +182,6 @@ export function MovementDialog({ onClose, onDone }: { onClose: () => void; onDon
       }
     >
       <div className="space-y-5">
-        {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>}
         <FormField label="Type">
           <Select value={type} onValueChange={(v) => setType(v as CashMovementType)}>
             {CASH_MOVEMENT_TYPES.map((t) => (

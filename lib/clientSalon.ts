@@ -118,3 +118,22 @@ export function arrangeSalons(list: SalonCard[], sort: SalonSort, onlineOnly: bo
   }
   return kept;
 }
+
+/** "12 Rue X, Casablanca": the city is added only when the address lacks it. */
+export function salonLocation(address?: string | null, city?: string | null): string {
+  const a = address?.trim() ?? '';
+  const c = city?.trim() ?? '';
+  if (!c) return a;
+  if (!a) return c;
+  return a.toLocaleLowerCase('fr').includes(c.toLocaleLowerCase('fr')) ? a : `${a}, ${c}`;
+}
+
+/**
+ * Whether the salon is closed on this date's weekday (weekly hours only).
+ * Unknown hours count as open, the free times then decide.
+ */
+export function isClosedOn(hours: DayHours[], date: Date): boolean {
+  if (hours.length === 0) return false;
+  const day = DAYS[(date.getDay() + 6) % 7];
+  return hours.find((h) => h.day === day)?.label === null;
+}

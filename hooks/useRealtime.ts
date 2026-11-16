@@ -14,13 +14,19 @@ import { api } from '@/lib/api/client';
  * `onNotification` runs when a notification is created for the salon; the
  * payload carries no content, the caller refetches what it needs.
  */
-export function useRealtime(channel: string | null, onNotification: () => void): { connected: boolean } {
+export function useRealtime(
+  channel: string | null,
+  onNotification: (type?: string) => void,
+  onChange?: (topic: string) => void,
+): { connected: boolean } {
   const [connected, setConnected] = useState(false);
   const handler = useRef(onNotification);
+  const changeHandler = useRef(onChange);
 
   useEffect(() => {
     handler.current = onNotification;
-  }, [onNotification]);
+    changeHandler.current = onChange;
+  }, [onNotification, onChange]);
 
   useEffect(() => {
     if (!channel) return;
@@ -41,7 +47,9 @@ export function useRealtime(channel: string | null, onNotification: () => void):
     socket.on('connect', () => setConnected(true));
     socket.on('disconnect', () => setConnected(false));
     socket.on('connect_error', () => setConnected(false));
-    socket.on('notification:tenant', () => handler.current());
+    socket.on('notification:tenant', (payload?: { type?: string }) => handler.current(payload?.type));
+    // Data changed by the team itself (no notification): open screens refresh.
+    socket.on('change:tenant', (payload?: { topic?: string }) => payload?.topic && changeHandler.current?.(payload.topic));
     return () => {
       socket?.disconnect();
       socket = null;

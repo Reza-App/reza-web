@@ -294,7 +294,7 @@ export default function ServicesPage() {
         }
       />
       <div className="mb-8 grid gap-3 sm:grid-cols-[1fr_260px]">
-        <SearchInput value={search} onChange={setSearch} placeholder="Rechercher une prestation..." />
+        <SearchInput fill value={search} onChange={setSearch} placeholder="Rechercher une prestation..." />
         <Select value={filter} onValueChange={setFilter} aria-label="Catégorie">
           <option value="all">Toutes les catégories</option>
           {groups.map(([category]) => (

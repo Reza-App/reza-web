@@ -169,13 +169,16 @@ export function SearchInput({
   value,
   onChange,
   placeholder = 'Rechercher...',
+  fill = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  /** Take the whole width of its column instead of the compact size. */
+  fill?: boolean;
 }) {
   return (
-    <label className="relative block w-full sm:w-72">
+    <label className={`relative block w-full ${fill ? '' : 'sm:w-72'}`}>
       <span className="sr-only">{placeholder}</span>
       <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" />
       <input

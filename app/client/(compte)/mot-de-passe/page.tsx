@@ -57,17 +57,16 @@ export default function ClientForgotPasswordPage() {
       {step === 'email' && (
         <form onSubmit={sendCode} className="mt-8 space-y-5" noValidate>
           <p className="text-sm text-neutral-500">Indiquez votre email : vous recevrez un code de vérification.</p>
-          {error && <FormAlert>{error}</FormAlert>}
           <Field label="Email">
             <input className={inputClass} type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
           </Field>
+          {error && <FormAlert>{error}</FormAlert>}
           <SubmitButton busy={busy}>Recevoir un code</SubmitButton>
         </form>
       )}
       {step === 'code' && (
         <form onSubmit={reset} className="mt-8 space-y-5" noValidate>
           {info && <FormAlert tone="success">{info}</FormAlert>}
-          {error && <FormAlert>{error}</FormAlert>}
           <Field label="Code reçu par email">
             <input className={`${inputClass} tracking-[0.4em]`} inputMode="numeric" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} />
           </Field>
@@ -77,6 +76,7 @@ export default function ClientForgotPasswordPage() {
           <Field label="Confirmation">
             <input className={inputClass} type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
           </Field>
+          {error && <FormAlert>{error}</FormAlert>}
           <SubmitButton busy={busy}>Changer le mot de passe</SubmitButton>
         </form>
       )}

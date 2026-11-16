@@ -14,6 +14,11 @@ export interface Review {
   client?: (PersonRef & { email?: string | null }) | null;
   employee?: PersonRef | null;
   appointment?: { id: string; startTime: string } | null;
+  /** Reported to Selia by the salon. */
+  reportedAt?: string | null;
+  /** Removed by Selia: hidden and locked. */
+  platformRemovedAt?: string | null;
+  platformRemovedReason?: string | null;
 }
 
 export interface ReviewStats {
@@ -33,6 +38,7 @@ export const reviewService = {
     api.get<{ reviews: Review[]; pagination: Pagination }>(R, { query, signal }),
   setStatus: (id: string, status: ReviewStatus, rejectReason?: string) =>
     api.put<{ review: Review }>(`${R}/${encodeURIComponent(id)}/status`, { status, rejectReason }),
+  report: (id: string, reason: string) => api.post<{ success: boolean }>(R + '/' + encodeURIComponent(id) + '/report', { reason }),
   remove: (id: string) => api.delete<void>(`${R}/${encodeURIComponent(id)}`),
   stats: (signal?: AbortSignal) =>
     api.get<{ stats: ReviewStats; reviews: Review[] }>('backend/dashboard/clients/statistiques/avis', { signal }),

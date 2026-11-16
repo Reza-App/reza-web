@@ -61,16 +61,6 @@ function ClientLoginForm() {
       <h1 className="text-4xl font-medium text-neutral-950">Bon retour</h1>
       <p className="mt-3 text-sm text-neutral-500">Connectez vous pour réserver et suivre vos rendez vous.</p>
       <form onSubmit={submit} className="mt-8 space-y-5" noValidate>
-        {formError && (
-          <FormAlert>
-            {formError}
-            {unverified && (
-              <button type="button" onClick={() => void resend()} className="mt-2 block font-medium underline">
-                Renvoyer l&apos;email de confirmation
-              </button>
-            )}
-          </FormAlert>
-        )}
         {info && <FormAlert tone="success">{info}</FormAlert>}
         <Field label="Email" error={errors.email}>
           <input className={inputClass} type="email" autoComplete="email" placeholder="vous@exemple.ma" value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -99,6 +89,16 @@ function ClientLoginForm() {
             Mot de passe oublié ?
           </Link>
         </div>
+        {formError && (
+          <FormAlert>
+            {formError}
+            {unverified && (
+              <button type="button" onClick={() => void resend()} className="mt-2 block font-medium underline">
+                Renvoyer l&apos;email de confirmation
+              </button>
+            )}
+          </FormAlert>
+        )}
         <SubmitButton busy={busy}>Se connecter</SubmitButton>
       </form>
       <p className="mt-8 text-center text-sm text-neutral-600">

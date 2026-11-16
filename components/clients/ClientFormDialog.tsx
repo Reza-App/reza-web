@@ -8,10 +8,19 @@ import { clientService, type ClientInput } from '@/lib/api/services/catalog.serv
 import { preferencesService } from '@/lib/api/services/preferences.service';
 import { errorMessage } from '@/lib/api/errors';
 import type { Client } from '@/lib/types/catalog';
-import { type FieldErrors, hasErrors, isValidEmail, isValidPhone, messages, normalizePhone, validate } from '@/lib/validation';
+import { errorSummary, type FieldErrors, hasErrors, isValidEmail, isValidPhone, messages, normalizePhone, validate } from '@/lib/validation';
 import { Select } from '@/components/ui/select';
 
 type Field = 'firstName' | 'lastName' | 'phone' | 'email' | 'gender' | 'birth' | 'address';
+const FIELD_LABELS: Record<Field, string> = {
+  firstName: 'Prénom',
+  lastName: 'Nom',
+  phone: 'Téléphone',
+  email: 'Email',
+  gender: 'Genre',
+  birth: 'Date de naissance',
+  address: 'Adresse',
+};
 
 export const CLIENT_STATUS_LABELS: Record<string, string> = {
   ACTIVE: 'Actif',
@@ -46,6 +55,8 @@ export function ClientFormDialog({
   });
   const [errors, setErrors] = useState<FieldErrors<Field>>({});
   const [busy, setBusy] = useState(false);
+  /** Bottom of the form: the fields to fix, or the server refusal. */
+  const [formError, setFormError] = useState<string | null>(null);
 
   const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -64,6 +75,7 @@ export function ClientFormDialog({
       address: () => (rules?.address.display && rules.address.required && !form.address.trim() ? messages.required : null),
     });
     setErrors(nextErrors);
+    setFormError(errorSummary(nextErrors, FIELD_LABELS));
     if (hasErrors(nextErrors)) return;
 
     const birth = form.birth ? (yearOnly ? `${form.birth.slice(0, 4)}-01-01` : form.birth) : '';
@@ -86,7 +98,7 @@ export function ClientFormDialog({
       onSaved(saved);
       onClose();
     } catch (error) {
-      toast.error(errorMessage(error));
+      setFormError(errorMessage(error));
     } finally {
       setBusy(false);
     }
@@ -98,6 +110,7 @@ export function ClientFormDialog({
       title={client ? 'Modifier la fiche client' : 'Nouveau client'}
       onClose={onClose}
       busy={busy}
+      error={formError}
       footer={
         <>
           <SecondaryButton onClick={onClose} disabled={busy}>

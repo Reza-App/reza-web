@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import { useRealtime } from '@/hooks/useRealtime';
+import { broadcastLive, type LiveTopic, topicOfNotification } from '@/hooks/useLiveRefresh';
 import { useToast } from '@/components/ui/toast';
 import { type AppNotification, notificationService } from '@/lib/api/services/notification.service';
 
@@ -27,7 +28,15 @@ export function useNotificationFeed(key: string | null) {
   const query = useApiQuery(key, (signal) => notificationService.feed(signal));
   const { refetch, data } = query;
   const seen = useRef<Set<string> | null>(null);
-  const { connected } = useRealtime(key, () => void refetch());
+  // The bell refetches; the open screen (agenda, reviews...) is told too.
+  const { connected } = useRealtime(
+    key,
+    (type) => {
+      void refetch();
+      broadcastLive(topicOfNotification(type));
+    },
+    (topic) => broadcastLive(topic as LiveTopic),
+  );
 
   useEffect(() => {
     if (!key) return;

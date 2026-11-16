@@ -15,9 +15,11 @@ import {
   messages,
   normalizePhone,
   validate,
+  errorSummary,
 } from '@/lib/validation';
 
 type FieldName = 'firstName' | 'lastName' | 'email' | 'phone' | 'password' | 'confirm';
+const FIELD_LABELS: Record<FieldName, string> = { firstName: 'Prénom', lastName: 'Nom', email: 'Email', phone: 'Téléphone', password: 'Mot de passe', confirm: 'Confirmation' };
 
 export default function ClientRegisterPage() {
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', phone: '', password: '', confirm: '', gender: '' });
@@ -38,7 +40,7 @@ export default function ClientRegisterPage() {
       confirm: () => (form.confirm !== form.password ? messages.passwordMatch : null),
     });
     setErrors(next);
-    setFormError(null);
+    setFormError(errorSummary(next, FIELD_LABELS));
     if (hasErrors(next)) return;
     setBusy(true);
     try {
@@ -72,7 +74,6 @@ export default function ClientRegisterPage() {
         </div>
       ) : (
         <form onSubmit={submit} className="mt-8 space-y-4" noValidate>
-          {formError && <FormAlert>{formError}</FormAlert>}
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Prénom" error={errors.firstName}>
               <input className={inputClass} autoComplete="given-name" value={form.firstName} onChange={set('firstName')} />
@@ -102,7 +103,15 @@ export default function ClientRegisterPage() {
               <input className={inputClass} type="password" autoComplete="new-password" value={form.confirm} onChange={set('confirm')} />
             </Field>
           </div>
+          {formError && <FormAlert>{formError}</FormAlert>}
           <SubmitButton busy={busy}>Créer mon compte</SubmitButton>
+          <p className="text-center text-xs leading-relaxed text-neutral-500">
+            En créant un compte, vous acceptez notre{' '}
+            <Link href="/client/confidentialite" target="_blank" className="font-medium text-neutral-800 underline">
+              politique de confidentialité
+            </Link>
+            .
+          </p>
         </form>
       )}
       <p className="mt-8 text-center text-sm text-neutral-600">

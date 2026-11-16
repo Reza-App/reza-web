@@ -8,7 +8,7 @@ import {
   startOfWeek,
   toISODate,
 } from '@/lib/format';
-import { hasErrors, isValidEmail, isValidPhone, normalizePhone, validate } from '@/lib/validation';
+import { errorSummary, hasErrors, isValidEmail, isValidPhone, normalizePhone, validate } from '@/lib/validation';
 import { monthGrid, parseAgendaFilters, rangeQuery, shiftDate } from '@/lib/agenda';
 
 describe('format', () => {
@@ -131,5 +131,14 @@ describe('layoutDay', () => {
     expect(byStart('10:00').lane).toBe(1);
     expect(byStart('09:00').lanes).toBe(2);
     expect(byStart('12:00').lanes).toBe(1);
+  });
+});
+
+describe('errorSummary', () => {
+  const labels = { firstName: 'Prénom', phone: 'Téléphone', email: 'Email' };
+  it('names the fields to fix, or nothing', () => {
+    expect(errorSummary({}, labels)).toBeNull();
+    expect(errorSummary({ phone: 'x' }, labels)).toBe('Vérifiez le champ Téléphone.');
+    expect(errorSummary({ firstName: 'x', email: 'y' }, labels)).toBe('Vérifiez les champs : Prénom, Email.');
   });
 });

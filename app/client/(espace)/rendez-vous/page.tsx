@@ -11,6 +11,7 @@ import { EmptyState, QueryBoundary } from '@/components/ui/states';
 import { useToast } from '@/components/ui/toast';
 import { useClientAuth } from '@/contexts/ClientAuthContext';
 import { useApiQuery } from '@/hooks/useApiQuery';
+import { useLiveRefresh } from '@/hooks/useLiveRefresh';
 import { errorMessage } from '@/lib/api/errors';
 import { APPOINTMENT_STATUS_LABEL, type ClientAppointment, type ClientReview, clientAccount } from '@/lib/api/services/clientArea.service';
 import { splitAppointments } from '@/lib/clientSalon';
@@ -83,7 +84,9 @@ function AppointmentCard({
             </span>
           )}
         </div>
-        {a.bookedFor && a.bookedFor.trim().toLowerCase() !== me?.toLowerCase() && <p className="mt-2 text-sm text-neutral-500">Pour {a.bookedFor}</p>}
+        {a.bookedFor && (a.isMine === false || a.bookedFor.trim().toLowerCase() !== me?.toLowerCase()) && (
+          <p className="mt-2 text-sm text-neutral-500">Pour {a.bookedFor}</p>
+        )}
         {review && (
           <div className="mt-4 rounded-2xl bg-neutral-50 px-4 py-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -139,6 +142,8 @@ export default function ClientAppointmentsPage() {
   const toast = useToast();
   const { client } = useClientAuth();
   const query = useApiQuery('client-appointments', (signal) => clientAccount.appointments(signal));
+  // Salon side changes (confirmed, cancelled) appear without reloading.
+  useLiveRefresh('agenda', query.refetch);
   const groups = useMemo(() => splitAppointments(query.data ?? []), [query.data]);
   const reviewsQuery = useApiQuery('client-reviews', (signal) => clientAccount.reviews(signal));
   // One review per appointment: the existing one is edited, not duplicated.
@@ -169,6 +174,10 @@ export default function ClientAppointmentsPage() {
       setBusy(false);
     }
   };
+
+  /** Other still active appointments of the same group booking. */
+  const groupOthers = (a: ClientAppointment) =>
+    a.bookingGroupId ? groups.upcoming.filter((x) => x.bookingGroupId === a.bookingGroupId && x.id !== a.id).length : 0;
 
   const editing = reviewing ? reviewByAppointment.get(reviewing.id) : undefined;
 
@@ -254,7 +263,8 @@ export default function ClientAppointmentsPage() {
                 me={client ? `${client.firstName} ${client.lastName}`.trim() : undefined}
                 onCancel={tab === 'upcoming' ? () => setCancelling(a) : undefined}
                 review={reviewByAppointment.get(a.id)}
-                onReview={tab === 'past' && a.status === 'completed' ? () => openReview(a) : undefined}
+                // Only the person seen reviews: not for an appointment booked for someone else.
+                onReview={tab === 'past' && a.status === 'completed' && a.isMine !== false ? () => openReview(a) : undefined}
                 onDeleteReview={() => {
                   const r = reviewByAppointment.get(a.id);
                   if (r) setDeletingReview(r);
@@ -275,7 +285,17 @@ export default function ClientAppointmentsPage() {
       <ConfirmDialog
         open={!!cancelling}
         title="Annuler ce rendez vous ?"
-        description={cancelling ? `${cancelling.salon}, le ${cancelling.date.split('-').reverse().join('/')} à ${cancelling.time}. Le salon peut refuser une annulation trop tardive : contactez le alors directement.` : ''}
+        description={
+          cancelling
+            ? `${cancelling.salon}, le ${cancelling.date.split('-').reverse().join('/')} à ${cancelling.time}.${
+                cancelling.isMine !== false && groupOthers(cancelling) > 0
+                  ? groupOthers(cancelling) === 1
+                    ? " C'est une réservation de groupe : le rendez vous de l'autre personne sera aussi annulé."
+                    : ` C'est une réservation de groupe : les rendez vous des ${groupOthers(cancelling)} autres personnes seront aussi annulés.`
+                  : ''
+              } Le salon peut refuser une annulation trop tardive : contactez le alors directement.`
+            : ''
+        }
         confirmLabel="Annuler le rendez vous"
         cancelLabel="Garder"
         destructive

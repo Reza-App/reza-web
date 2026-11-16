@@ -135,6 +135,7 @@ export default function ClientRelativesPage() {
       </QueryBoundary>
 
       <Modal
+        error={error}
         open={!!editing}
         title={editing === 'new' ? 'Ajouter un proche' : 'Modifier le proche'}
         busy={busy}
@@ -151,7 +152,6 @@ export default function ClientRelativesPage() {
         }
       >
         <div className="grid gap-4 sm:grid-cols-2">
-          {error && <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-800 sm:col-span-2">{error}</p>}
           <FormField label="Prénom">
             <input className={fieldClass} value={draft.firstName} onChange={set('firstName')} />
           </FormField>

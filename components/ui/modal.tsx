@@ -2,12 +2,13 @@
 
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X } from 'lucide-react';
+import { AlertCircle, X } from 'lucide-react';
 
 /**
  * Create and edit forms: a dialog over the page. Escape, the cross or a click
  * outside closes it (not while saving). Focus moves into the dialog once,
- * when it opens.
+ * when it opens. A form error shows at the bottom, right above the buttons,
+ * so it is seen without scrolling back up.
  */
 export function Modal({
   open,
@@ -17,6 +18,7 @@ export function Modal({
   footer,
   size = 'md',
   busy = false,
+  error,
 }: {
   open: boolean;
   title: string;
@@ -25,6 +27,8 @@ export function Modal({
   footer?: React.ReactNode;
   size?: 'sm' | 'md' | 'lg';
   busy?: boolean;
+  /** Message of the last failed submit (validation or server). */
+  error?: string | null;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -83,7 +87,13 @@ export function Modal({
           </button>
         </div>
         <div className="flex-1 overflow-y-auto px-7 py-6">{children}</div>
-        {footer && <div className="flex justify-end gap-2 border-t border-neutral-100 px-7 py-4">{footer}</div>}
+        {error && (
+          <p role="alert" className="animate-fadeIn mx-7 mb-1 mt-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            <AlertCircle size={16} className="mt-0.5 shrink-0" />
+            <span>{error}</span>
+          </p>
+        )}
+        {footer && <div className={`flex justify-end gap-2 px-7 py-4 ${error ? '' : 'border-t border-neutral-100'}`}>{footer}</div>}
       </div>
     </div>,
     document.body,

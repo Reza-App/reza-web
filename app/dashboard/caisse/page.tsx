@@ -9,6 +9,7 @@ import { PrimaryButton } from '@/components/ui/modal';
 import { Badge, Card, PageHeader, Pagination, StatCard, Table } from '@/components/ui/page';
 import { EmptyState, QueryBoundary } from '@/components/ui/states';
 import { useApiQuery } from '@/hooks/useApiQuery';
+import { useLiveRefresh } from '@/hooks/useLiveRefresh';
 import { useUrlState } from '@/hooks/useUrlState';
 import { useAuth } from '@/contexts/AuthContext';
 import { cashService, type Invoice, INVOICE_STATUS_LABELS, invoiceService } from '@/lib/api/services/invoice.service';
@@ -46,6 +47,7 @@ export default function CaissePage() {
     const [invoices, cash] = await Promise.all([invoiceService.list(range, signal), cashService.list(range, signal)]);
     return buildLedger(invoices, cash.transactions);
   });
+  useLiveRefresh('agenda', query.refetch);
 
   const ledger = useMemo(() => query.data ?? [], [query.data]);
   const totals = useMemo(() => ledgerTotals(ledger), [ledger]);

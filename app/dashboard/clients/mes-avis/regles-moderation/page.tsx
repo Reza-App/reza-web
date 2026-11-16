@@ -98,6 +98,7 @@ function RuleDialog({ rule, onClose, onSave }: { rule: ModerationRule; onClose: 
 
   return (
     <Modal
+      error={error}
       open
       title={rule.name ? 'Modifier la règle' : 'Nouvelle règle'}
       onClose={onClose}
@@ -112,7 +113,6 @@ function RuleDialog({ rule, onClose, onSave }: { rule: ModerationRule; onClose: 
       }
     >
       <div className="space-y-4">
-        {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>}
         <FormField label="Nom">
           <input className={fieldClass} maxLength={80} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
         </FormField>

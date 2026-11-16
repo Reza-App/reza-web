@@ -13,7 +13,7 @@ import { useClientAuth } from '@/contexts/ClientAuthContext';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import { errorMessage } from '@/lib/api/errors';
 import { clientAccount, discovery } from '@/lib/api/services/clientArea.service';
-import { durationLabel, groupServices, openingHours, servicePrice } from '@/lib/clientSalon';
+import { durationLabel, groupServices, openingHours, servicePrice, salonLocation } from '@/lib/clientSalon';
 import { formatDate, personName } from '@/lib/format';
 import { CLIENT_LOGIN } from '@/lib/session';
 
@@ -130,7 +130,7 @@ export default function ClientSalonPage({ params }: { params: Promise<{ id: stri
                   ) : null}
                   {(salon.address || salon.city) && (
                     <span className="flex items-center gap-1.5">
-                      <MapPin size={15} /> {[salon.address, salon.city].filter(Boolean).join(', ')}
+                      <MapPin size={15} /> {salonLocation(salon.address, salon.city)}
                     </span>
                   )}
                   {salon.nextAvailable && <span className="text-emerald-700">{salon.nextAvailable}</span>}

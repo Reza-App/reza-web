@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
+import { Eye } from 'lucide-react';
 import { Badge, PageHeader, Pagination, SearchInput, Table } from '@/components/ui/page';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { EmptyState, QueryBoundary } from '@/components/ui/states';
@@ -78,11 +80,17 @@ export default function PlatformSalonsPage() {
         {salons.length === 0 ? (
           <EmptyState title="Aucun établissement" description={term ? 'Aucun établissement ne correspond à cette recherche.' : undefined} />
         ) : (
-          <Table head={['Établissement', 'Propriétaire', 'Clients', 'RDV', 'Inscrit le', 'Abonnement', 'Mis en avant', 'Compte']}>
+          <Table head={['Établissement', 'Propriétaire', 'Clients', 'RDV', 'Inscrit le', 'Visibilité', 'Mis en avant', 'Compte', <span key="a" className="block text-right">Actions</span>]}>
             {salons.map((s) => (
               <tr key={s.id} className="hover:bg-neutral-50">
                 <td className="px-5 py-3">
-                  <p className="font-medium text-neutral-950">{s.name}</p>
+                  {s.account ? (
+                    <Link href={`/plateforme/etablissements/${encodeURIComponent(s.account.id)}`} className="font-medium text-neutral-950 hover:underline">
+                      {s.name}
+                    </Link>
+                  ) : (
+                    <p className="font-medium text-neutral-950">{s.name}</p>
+                  )}
                   <p className="text-xs text-neutral-500">{s.city || 'Ville non renseignée'}</p>
                 </td>
                 <td className="px-5 py-3">
@@ -93,7 +101,7 @@ export default function PlatformSalonsPage() {
                 <td className="px-5 py-3 tabular-nums">{formatNumber(s.appointmentCount)}</td>
                 <td className="whitespace-nowrap px-5 py-3 text-neutral-600">{formatDate(s.createdAt)}</td>
                 <td className="px-5 py-3">
-                  <Badge tone={s.subscriptionActive ? 'green' : 'amber'}>{s.subscriptionActive ? 'Actif' : 'Non payé'}</Badge>
+                  <Badge tone={s.subscriptionActive ? 'green' : 'amber'}>{s.subscriptionActive ? 'Visible' : 'Masqué'}</Badge>
                 </td>
                 <td className="px-5 py-3">
                   <Switch checked={s.featured} disabled={busyId === s.id} onChange={() => void toggleFeatured(s)} label={`Mettre ${s.name} en avant`} />
@@ -112,6 +120,16 @@ export default function PlatformSalonsPage() {
                     </button>
                   ) : (
                     <span className="text-xs text-neutral-400">Sans compte</span>
+                  )}
+                </td>
+                <td className="px-5 py-3 text-right">
+                  {s.account && (
+                    <Link
+                      href={`/plateforme/etablissements/${encodeURIComponent(s.account.id)}`}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 px-3.5 py-1.5 text-xs font-medium text-neutral-900 transition hover:bg-neutral-950 hover:text-white"
+                    >
+                      <Eye size={14} /> Ouvrir
+                    </Link>
                   )}
                 </td>
               </tr>

@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Camera, ChevronRight, Heart, LogOut, Star, Trash2, Users } from 'lucide-react';
+import { Camera, ChevronRight, Heart, LogOut, ShieldCheck, Star, Trash2, Users } from 'lucide-react';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { FormField, PrimaryButton, SecondaryButton, fieldClass } from '@/components/ui/modal';
 import { Select } from '@/components/ui/select';
@@ -289,6 +289,7 @@ export default function ClientProfilePage() {
               {[
                 { href: '/client/proches', label: 'Mes proches', icon: Users },
                 { href: '/client/favoris', label: 'Mes favoris', icon: Heart },
+                { href: '/client/confidentialite', label: 'Politique de confidentialité', icon: ShieldCheck },
               ].map(({ href, label, icon: Icon }) => (
                 <li key={href}>
                   <Link href={href} className="flex items-center justify-between py-3 text-sm text-neutral-800 hover:text-neutral-950">

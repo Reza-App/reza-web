@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, RotateCcw, Star, Trash2, X } from 'lucide-react';
+import { Check, Flag, RotateCcw, Star, Trash2, X } from 'lucide-react';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { FormField, Modal, PrimaryButton, SecondaryButton, fieldClass } from '@/components/ui/modal';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -9,6 +9,7 @@ import { Avatar, Badge, Card, PageHeader, Pagination, SegmentedControl, StatCard
 import { EmptyState, QueryBoundary } from '@/components/ui/states';
 import { useToast } from '@/components/ui/toast';
 import { useApiQuery } from '@/hooks/useApiQuery';
+import { useLiveRefresh } from '@/hooks/useLiveRefresh';
 import { useUrlState } from '@/hooks/useUrlState';
 import { type Review, type ReviewStatus, reviewService } from '@/lib/api/services/review.service';
 import { errorMessage } from '@/lib/api/errors';
@@ -54,11 +55,16 @@ export function ReviewList({ status }: { status: ReviewStatus }) {
   const [rejecting, setRejecting] = useState<Review | null>(null);
   const [reason, setReason] = useState('');
   const [deleting, setDeleting] = useState<Review | null>(null);
+  const [reporting, setReporting] = useState<Review | null>(null);
+  const [reportReason, setReportReason] = useState('');
+  const [reportError, setReportError] = useState<string | null>(null);
   const canModerate = usePermissions().can('reviews.moderate');
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const query = useApiQuery(`reviews:${status}:${page}`, (signal) => reviewService.list({ status, page, limit: PAGE_SIZE }, signal));
   const stats = useApiQuery('review-stats', (signal) => reviewService.stats(signal));
+  // New client reviews and teammates' moderation appear at once.
+  useLiveRefresh('reviews', () => Promise.all([query.refetch(), stats.refetch()]));
 
   const refresh = () => {
     void query.refetch();
@@ -75,6 +81,24 @@ export function ReviewList({ status }: { status: ReviewStatus }) {
       refresh();
     } catch (error) {
       toast.error(errorMessage(error));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const report = async () => {
+    if (!reporting) return;
+    if (reportReason.trim().length < 3) return setReportError('Expliquez en quelques mots pourquoi.');
+    setBusyId(reporting.id);
+    setReportError(null);
+    try {
+      await reviewService.report(reporting.id, reportReason.trim());
+      toast.success('Avis signalé à Selia.');
+      setReporting(null);
+      setReportReason('');
+      refresh();
+    } catch (error) {
+      setReportError(errorMessage(error));
     } finally {
       setBusyId(null);
     }
@@ -165,10 +189,25 @@ export function ReviewList({ status }: { status: ReviewStatus }) {
                           <Badge tone="danger">Motif : {review.rejectReason}</Badge>
                         </p>
                       )}
+                      {review.reportedAt && !review.platformRemovedAt && (
+                        <p className="mt-3 flex items-center gap-1.5 text-xs text-amber-800">
+                          <Flag size={13} /> Signalé à Selia le {formatDate(review.reportedAt)}, en cours d&apos;examen.
+                        </p>
+                      )}
                     </div>
                   </div>
-                  {canModerate && (
+                  {canModerate && !review.platformRemovedAt && (
                     <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-neutral-100 pt-4">
+                      {!review.reportedAt && (
+                        <button
+                          type="button"
+                          onClick={() => setReporting(review)}
+                          disabled={busy}
+                          className="mr-auto inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs text-neutral-500 hover:bg-neutral-100 hover:text-neutral-950"
+                        >
+                          <Flag size={13} /> Signaler à Selia
+                        </button>
+                      )}
                       {status === 'REJECTED' && (
                         <SecondaryButton onClick={() => setDeleting(review)} disabled={busy} className="mr-auto text-red-700">
                           <Trash2 size={15} /> Supprimer
@@ -236,6 +275,28 @@ export function ReviewList({ status }: { status: ReviewStatus }) {
         onConfirm={remove}
         onCancel={() => setDeleting(null)}
       />
+
+      <Modal
+        open={!!reporting}
+        size="sm"
+        title="Signaler cet avis à Selia"
+        onClose={() => setReporting(null)}
+        busy={!!busyId}
+        error={reportError}
+        footer={
+          <>
+            <SecondaryButton onClick={() => setReporting(null)}>Annuler</SecondaryButton>
+            <PrimaryButton busy={!!busyId} onClick={() => void report()}>
+              Signaler
+            </PrimaryButton>
+          </>
+        }
+      >
+        <p className="mb-4 text-sm text-neutral-600">Pour un faux avis ou des propos injurieux. Selia l&apos;examine et peut le retirer de votre page.</p>
+        <FormField label="Pourquoi ?">
+          <textarea className={fieldClass} rows={3} maxLength={500} value={reportReason} onChange={(e) => setReportReason(e.target.value)} />
+        </FormField>
+      </Modal>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { MapPin, Star } from 'lucide-react';
 import type { SalonCard as Salon } from '@/lib/api/services/clientArea.service';
+import { salonLocation } from '@/lib/clientSalon';
 
 /** Salon tile of the discovery grid and favorites. */
 export function SalonCard({ salon, action }: { salon: Salon; action?: React.ReactNode }) {
@@ -34,7 +35,7 @@ export function SalonCard({ salon, action }: { salon: Salon; action?: React.Reac
           {(salon.city || salon.address) && (
             <p className="flex items-center gap-1.5 text-sm text-neutral-500">
               <MapPin size={14} className="shrink-0" />
-              <span className="truncate">{[salon.address, salon.city].filter(Boolean).join(', ')}</span>
+              <span className="truncate">{salonLocation(salon.address, salon.city)}</span>
             </p>
           )}
           <div className="flex items-center justify-between pt-1 text-sm">

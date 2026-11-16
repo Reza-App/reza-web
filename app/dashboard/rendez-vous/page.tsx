@@ -9,6 +9,7 @@ import { TimeGrid } from '@/components/agenda/TimeGrid';
 import { ErrorState } from '@/components/ui/states';
 import { useToast } from '@/components/ui/toast';
 import { useApiQuery } from '@/hooks/useApiQuery';
+import { useLiveRefresh } from '@/hooks/useLiveRefresh';
 import { useEmployees, useServices } from '@/hooks/useReferenceData';
 import { useUrlState } from '@/hooks/useUrlState';
 import { useAuth } from '@/contexts/AuthContext';
@@ -59,6 +60,8 @@ export default function AgendaPage() {
         signal,
       ),
   );
+  // Online bookings and teammates' changes show up without reloading.
+  useLiveRefresh('agenda', appointments.refetch);
 
   const [selected, setSelected] = useState<Appointment | null>(null);
   const [createAt, setCreateAt] = useState<Date | null>(null);

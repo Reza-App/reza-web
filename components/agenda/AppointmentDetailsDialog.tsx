@@ -11,20 +11,7 @@ import { formatDuration, formatMoney, personName, toTimeLabel } from '@/lib/form
 import { type Appointment, type AppointmentStatus, appointmentClientName, isWalkInAppointment, statusLabel } from '@/lib/types/appointment';
 import { APPOINTMENT_STATUS_TONES, statusTone } from '@/lib/status';
 import { Badge } from '@/components/ui/page';
-
-/** Allowed next statuses from the current one (front side guard). */
-const TRANSITIONS: Partial<Record<AppointmentStatus, AppointmentStatus[]>> = {
-  PENDING: ['CONFIRMED'],
-  CONFIRMED: ['IN_PROGRESS', 'COMPLETED', 'NO_SHOW'],
-  IN_PROGRESS: ['COMPLETED'],
-};
-
-const ACTION_LABELS: Partial<Record<AppointmentStatus, string>> = {
-  CONFIRMED: 'Confirmer',
-  IN_PROGRESS: 'Démarrer',
-  COMPLETED: 'Marquer terminé',
-  NO_SHOW: 'Client absent',
-};
+import { canChangeStatus, statusActions, statusHint } from '@/lib/appointmentStatus';
 
 export function AppointmentDetailsDialog({
   appointment,
@@ -42,8 +29,10 @@ export function AppointmentDetailsDialog({
   if (!appointment) return null;
   const start = new Date(appointment.startTime);
   const end = new Date(appointment.endTime);
-  const next = TRANSITIONS[appointment.status] ?? [];
-  const cancellable = !['CANCELLED', 'COMPLETED', 'NO_SHOW'].includes(appointment.status);
+  const actions = statusActions(appointment.status, start, undefined, end);
+  const hint = statusHint(appointment.status, start);
+  const cancellable = canChangeStatus(appointment.status, 'CANCELLED', start);
+  const inGroup = !!appointment.bookingGroupId;
 
   const changeStatus = async (status: AppointmentStatus) => {
     setBusy(true);
@@ -88,17 +77,23 @@ export function AppointmentDetailsDialog({
                 Annuler le RDV
               </SecondaryButton>
             )}
-            {next.map((status) => (
-              <button
-                key={status}
-                type="button"
-                disabled={busy}
-                onClick={() => changeStatus(status)}
-                className="rounded-full bg-neutral-950 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:opacity-50"
-              >
-                {ACTION_LABELS[status]}
-              </button>
-            ))}
+            {actions.map((action) =>
+              action.kind === 'primary' ? (
+                <button
+                  key={action.to}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => changeStatus(action.to)}
+                  className="rounded-full bg-neutral-950 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:opacity-50"
+                >
+                  {action.label}
+                </button>
+              ) : (
+                <SecondaryButton key={action.to} disabled={busy} onClick={() => changeStatus(action.to)}>
+                  {action.label}
+                </SecondaryButton>
+              ),
+            )}
           </>
         }
       >
@@ -158,12 +153,13 @@ export function AppointmentDetailsDialog({
             </div>
           )}
           {appointment.takenOnline && <p className="text-xs text-neutral-500">Réservé en ligne par le client.</p>}
+          {hint && <p className="rounded-xl bg-neutral-50 px-4 py-3 text-xs text-neutral-600">{hint}</p>}
         </div>
       </Modal>
       <ConfirmDialog
         open={confirmCancel}
         title="Annuler ce rendez vous ?"
-        description="Le rendez vous sera placé dans la corbeille des RDV annulés et le client en sera informé."
+        description={`Le rendez vous sera placé dans la corbeille des RDV annulés et le client recevra une notification.${inGroup ? ' Les autres personnes du groupe gardent leur rendez vous.' : ''}`}
         confirmLabel="Annuler le RDV"
         cancelLabel="Retour"
         destructive

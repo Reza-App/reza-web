@@ -1,8 +1,9 @@
 import { api } from '../client';
 import type { Invoice } from './invoice.service';
+import type { EmployeeTier } from './platform.service';
 
 export interface SubscriptionBill {
-  config: { pricePerSalon: number; freeEmployeeThreshold: number; pricePerEmployee: number; currency: string };
+  config: { pricePerSalon: number; freeEmployeeThreshold: number; pricePerEmployee: number; employeeTiers: EmployeeTier[] | null; currency: string };
   salonCount: number;
   salonsDue: number;
   salonFee: number;
@@ -11,12 +12,35 @@ export interface SubscriptionBill {
   employeeFee: number;
   total: number;
   periodActive: boolean;
+  /** This bill pays the next period (renewal window or grace days). */
+  renewalDue: boolean;
   status: string;
   currentPeriodEnd?: string | null;
-  salons: { id: string; name: string; employeeCount: number; salonFee: number; employeeFee: number; total: number; subscriptionActive: boolean }[];
+  salons: {
+    id: string;
+    name: string;
+    employeeCount: number;
+    employeesPaid: number;
+    billableEmployees: number;
+    salonCovered: boolean;
+    salonFee: number;
+    employeeFee: number;
+    total: number;
+    subscriptionActive: boolean;
+  }[];
+}
+
+export interface BankDetails {
+  name?: string | null;
+  accountHolder?: string | null;
+  rib?: string | null;
+  swift?: string | null;
+  note?: string | null;
 }
 
 export interface SubscriptionOverview {
+  bank: BankDetails;
+  graceDays: number;
   subscription: { status: string; subscribedAt?: string | null; currentPeriodEnd?: string | null; salonsPaid: number };
   bill: SubscriptionBill;
 }
@@ -41,13 +65,6 @@ export const PAYMENT_STATUS_LABELS: Record<SubscriptionPaymentStatus, string> = 
   REJECTED: 'Refusé',
 };
 
-export const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
-  ACTIVE: 'Actif',
-  TRIAL: "Période d'essai",
-  PAST_DUE: 'En retard de paiement',
-  EXPIRED: 'Expiré',
-  CANCELLED: 'Résilié',
-};
 
 export const subscriptionService = {
   overview: (signal?: AbortSignal) => api.get<SubscriptionOverview>('backend/subscription', { signal }),

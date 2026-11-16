@@ -71,6 +71,7 @@ export function BarChartView<T extends object>({
   series,
   height = 260,
   format,
+  tickFormat,
   layout = 'horizontal',
 }: {
   data: T[];
@@ -78,6 +79,8 @@ export function BarChartView<T extends object>({
   series: Series[];
   height?: number;
   format?: (value: number) => string;
+  /** Shorter label for the value axis (the tooltip keeps format). */
+  tickFormat?: (value: number) => string;
   /** 'vertical' draws horizontal bars (long category names). */
   layout?: 'horizontal' | 'vertical';
 }) {
@@ -94,7 +97,7 @@ export function BarChartView<T extends object>({
         ) : (
           <>
             <XAxis dataKey={x} {...axisProps} />
-            <YAxis {...axisProps} tickFormatter={format} allowDecimals={false} />
+            <YAxis {...axisProps} tickFormatter={tickFormat ?? format} allowDecimals={false} />
           </>
         )}
         <Tooltip cursor={{ fill: '#f4f4f4' }} content={<ChartTooltip format={format} />} />

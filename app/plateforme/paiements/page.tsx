@@ -54,7 +54,7 @@ export default function PlatformPaymentsPage() {
     <div>
       <PageHeader
         title="Paiements d'abonnement"
-        description="Virements déclarés par les établissements. Valider un paiement active ou prolonge leur abonnement."
+        description="Virements déclarés par les établissements. Vérifiez la réception sur le compte avant de valider : la validation publie les salons payés, prolonge l'abonnement et émet la facture."
       />
 
       <div className="mb-5">
@@ -76,7 +76,29 @@ export default function PlatformPaymentsPage() {
                   <p className="font-medium text-neutral-950">{personName(p.account?.owner) || '-'}</p>
                   <p className="text-xs text-neutral-500">{p.account?.owner?.email}</p>
                 </td>
-                <td className="px-5 py-3 text-neutral-700">{p.account?.salons.map((s) => s.name).join(', ') || '-'}</td>
+                <td className="px-5 py-3 text-neutral-700">
+                  {/* What this payment covers, as declared (not every salon of the account). */}
+                  {p.details?.salons?.length ? (
+                    <ul className="space-y-1">
+                      {p.details.salons.map((s) => (
+                        <li key={s.id}>
+                          <span className="font-medium text-neutral-900">{s.name}</span>
+                          <span className="block text-xs text-neutral-500">
+                            {[
+                              s.salonFee > 0 && `activation ${formatMoney(s.salonFee)}`,
+                              s.employeeFee > 0 && `${s.billableEmployees} collaborateur${s.billableEmployees > 1 ? 's' : ''} ${formatMoney(s.employeeFee)}`,
+                            ]
+                              .filter(Boolean)
+                              .join(', ') || 'rien à régler'}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    p.account?.salons.map((s) => s.name).join(', ') || '-'
+                  )}
+                  {p.details?.renewal && <Badge tone="sky">Renouvellement</Badge>}
+                </td>
                 <td className="whitespace-nowrap px-5 py-3 font-medium tabular-nums">{formatMoney(p.amount)}</td>
                 <td className="px-5 py-3">
                   <p className="text-neutral-800">{p.reference || '-'}</p>
@@ -88,6 +110,13 @@ export default function PlatformPaymentsPage() {
                   {p.status === 'REJECTED' && p.rejectedReason && <p className="mt-1 max-w-48 text-xs text-neutral-500">{p.rejectedReason}</p>}
                 </td>
                 <td className="px-5 py-3">
+                  {p.status === 'APPROVED' && p.hasInvoice === false && (
+                    <div className="flex justify-end">
+                      <ToneButton tone="neutral" disabled={busy} onClick={() => void run(() => platformService.issueInvoice(p.id), 'Facture émise.')}>
+                        Émettre la facture
+                      </ToneButton>
+                    </div>
+                  )}
                   {p.status === 'PENDING' && (
                     <div className="flex justify-end gap-2">
                       <ToneButton tone="red" onClick={() => setRejecting(p)}>
@@ -111,7 +140,7 @@ export default function PlatformPaymentsPage() {
         title="Valider ce paiement ?"
         description={
           approving
-            ? `${formatMoney(approving.amount)} de ${personName(approving.account?.owner)}. L'abonnement de ses établissements sera activé ou prolongé, et le propriétaire sera notifié.`
+            ? `${formatMoney(approving.amount)} de ${personName(approving.account?.owner)}. Les salons payés seront publiés, l'abonnement prolongé, la facture émise et le propriétaire notifié.`
             : ''
         }
         confirmLabel="Valider le paiement"

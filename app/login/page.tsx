@@ -18,6 +18,7 @@ import {
   PASSWORD_MIN_LENGTH,
   safeNextPath,
   validate,
+  errorSummary,
 } from '@/lib/validation';
 
 type Mode = 'login' | 'signup' | 'forgot';
@@ -77,7 +78,7 @@ function LoginForm({ onForgot }: { onForgot: () => void }) {
       password: () => (password ? null : messages.required),
     });
     setErrors(nextErrors);
-    setFormError(null);
+    setFormError(errorSummary(nextErrors, FIELD_LABELS));
     setUnverified(false);
     if (hasErrors(nextErrors)) return;
 
@@ -107,24 +108,6 @@ function LoginForm({ onForgot }: { onForgot: () => void }) {
 
   return (
     <form onSubmit={submit} noValidate className="space-y-5">
-      {formError && (
-        <FormAlert>
-          {formError}
-          {unverified && (
-            <button type="button" onClick={resend} className="ml-1 font-semibold underline">
-              Renvoyer le lien
-            </button>
-          )}
-          {!unverified && (
-            <span className="mt-1 block">
-              Vous êtes client ?{' '}
-              <a href="/client/connexion" className="font-semibold underline">
-                Connectez vous à l&apos;espace client
-              </a>
-            </span>
-          )}
-        </FormAlert>
-      )}
       {info && <FormAlert tone="success">{info}</FormAlert>}
       <Field label="Email" error={errors.email}>
         <input
@@ -154,12 +137,40 @@ function LoginForm({ onForgot }: { onForgot: () => void }) {
           Mot de passe oublié ?
         </button>
       </div>
+      {formError && (
+        <FormAlert>
+          {formError}
+          {unverified && (
+            <button type="button" onClick={resend} className="ml-1 font-semibold underline">
+              Renvoyer le lien
+            </button>
+          )}
+          {!unverified && (
+            <span className="mt-1 block">
+              Vous êtes client ?{' '}
+              <a href="/client/connexion" className="font-semibold underline">
+                Connectez vous à l&apos;espace client
+              </a>
+            </span>
+          )}
+        </FormAlert>
+      )}
       <SubmitButton busy={busy}>Se connecter</SubmitButton>
     </form>
   );
 }
 
 type SignupField = 'firstName' | 'lastName' | 'salonName' | 'email' | 'phone' | 'password' | 'confirm' | 'terms';
+const FIELD_LABELS: Record<SignupField, string> = {
+  firstName: 'Prénom',
+  lastName: 'Nom',
+  salonName: 'Nom du salon',
+  email: 'Email',
+  phone: 'Téléphone',
+  password: 'Mot de passe',
+  confirm: 'Confirmation',
+  terms: 'Conditions d’utilisation',
+};
 
 function SignupForm({ onDone }: { onDone: (email: string) => void }) {
   const [form, setForm] = useState({
@@ -215,7 +226,6 @@ function SignupForm({ onDone }: { onDone: (email: string) => void }) {
 
   return (
     <form onSubmit={submit} noValidate className="space-y-4">
-      {formError && <FormAlert>{formError}</FormAlert>}
       <div className="grid grid-cols-2 gap-3">
         <Field label="Prénom" error={errors.firstName}>
           <input value={form.firstName} onChange={update('firstName')} autoComplete="given-name" className={inputClass} />
@@ -244,6 +254,7 @@ function SignupForm({ onDone }: { onDone: (email: string) => void }) {
         <span>J&apos;accepte les conditions d&apos;utilisation et la politique de confidentialité de Selia.</span>
       </label>
       {errors.terms && <p className="text-xs text-red-700">{errors.terms}</p>}
+      {formError && <FormAlert>{formError}</FormAlert>}
       <SubmitButton busy={busy}>Créer mon espace</SubmitButton>
     </form>
   );

@@ -36,6 +36,8 @@ export interface Appointment {
   client?: (PersonRef & { email?: string | null; phone?: string | null; isWalkIn?: boolean }) | null;
   /** Name typed for a walk in client (no client file). */
   walkInName?: string | null;
+  /** Set when the appointment belongs to a group booking. */
+  bookingGroupId?: string | null;
   employee?: PersonRef | null;
   startTime: string;
   endTime: string;

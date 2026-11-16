@@ -25,6 +25,11 @@ function save(config: BillingConfig) {
     pricePerEmployee: config.pricePerEmployee,
     employeeTiers: tiers,
     currency: config.currency.trim().toUpperCase(),
+    bankName: config.bankName?.trim() ?? '',
+    bankAccountHolder: config.bankAccountHolder?.trim() ?? '',
+    bankRib: config.bankRib?.replace(/\s+/g, ' ').trim() ?? '',
+    bankSwift: config.bankSwift?.trim().toUpperCase() ?? '',
+    transferNote: config.transferNote?.trim() ?? '',
   });
 }
 
@@ -53,13 +58,13 @@ export default function PlatformBillingPage() {
           <div className="grid gap-6 xl:grid-cols-2">
             <Card title="Abonnement">
               <div className="grid gap-4 sm:grid-cols-2">
-                <FormField label="Prix par établissement" hint="Montant par salon.">
+                <FormField label="Frais d&apos;activation par salon" hint="Payés une seule fois, à l&apos;ouverture du salon.">
                   <input className={fieldClass} inputMode="decimal" value={draft.pricePerSalon} onChange={(e) => set({ pricePerSalon: toNumber(e.target.value) })} />
                 </FormField>
                 <FormField label="Devise" hint="Code à 3 lettres (MAD).">
                   <input className={fieldClass} maxLength={8} value={draft.currency} onChange={(e) => set({ currency: e.target.value })} />
                 </FormField>
-                <FormField label="Collaborateurs inclus" hint="Nombre de collaborateurs sans supplément.">
+                <FormField label="Collaborateurs inclus" hint="Par salon, sans frais mensuels.">
                   <input className={fieldClass} inputMode="numeric" value={draft.freeEmployeeThreshold} onChange={(e) => set({ freeEmployeeThreshold: Math.trunc(toNumber(e.target.value)) })} />
                 </FormField>
                 <FormField label="Prix par collaborateur" hint="Utilisé quand aucun palier n'est défini.">
@@ -68,9 +73,9 @@ export default function PlatformBillingPage() {
               </div>
             </Card>
 
-            <Card title="Paliers collaborateurs supplémentaires">
+            <Card title="Paliers collaborateurs (par mois)">
               <p className="mb-4 text-sm text-neutral-500">
-                Prix par collaborateur selon son rang. Sans palier, le prix par collaborateur ({formatMoney(draft.pricePerEmployee)}) s&apos;applique.
+                Prix mensuel par collaborateur, selon le nombre de collaborateurs facturés du salon (tous au prix du palier atteint). Sans palier, le prix par collaborateur ({formatMoney(draft.pricePerEmployee)}) s&apos;applique.
               </p>
               {tiers.length > 0 && (
                 <ul className="space-y-2">
@@ -107,6 +112,27 @@ export default function PlatformBillingPage() {
               <button type="button" onClick={addTier} className="mt-4 inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-100">
                 <Plus size={16} /> Ajouter un palier
               </button>
+            </Card>
+
+            <Card title="Coordonnées bancaires" className="xl:col-span-2">
+              <p className="mb-4 text-sm text-neutral-500">Affichées aux établissements sur leur page d&apos;abonnement, pour effectuer leur virement.</p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField label="Titulaire du compte">
+                  <input className={fieldClass} maxLength={160} value={draft.bankAccountHolder ?? ''} onChange={(e) => set({ bankAccountHolder: e.target.value })} />
+                </FormField>
+                <FormField label="Banque">
+                  <input className={fieldClass} maxLength={120} value={draft.bankName ?? ''} onChange={(e) => set({ bankName: e.target.value })} />
+                </FormField>
+                <FormField label="RIB" hint="24 chiffres.">
+                  <input className={fieldClass} maxLength={60} inputMode="numeric" value={draft.bankRib ?? ''} onChange={(e) => set({ bankRib: e.target.value })} />
+                </FormField>
+                <FormField label="Code SWIFT (facultatif)">
+                  <input className={fieldClass} maxLength={20} value={draft.bankSwift ?? ''} onChange={(e) => set({ bankSwift: e.target.value })} />
+                </FormField>
+                <FormField label="Consigne (facultatif)" hint="Par exemple : indiquez le nom de votre salon en motif du virement." className="sm:col-span-2">
+                  <input className={fieldClass} maxLength={500} value={draft.transferNote ?? ''} onChange={(e) => set({ transferNote: e.target.value })} />
+                </FormField>
+              </div>
             </Card>
           </div>
         )}

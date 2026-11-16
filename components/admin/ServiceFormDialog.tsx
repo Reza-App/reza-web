@@ -97,6 +97,7 @@ export function ServiceFormDialog({
 
   return (
     <Modal
+      error={error}
       open
       size="lg"
       title={service ? 'Modifier la prestation' : 'Nouvelle prestation'}
@@ -112,11 +113,6 @@ export function ServiceFormDialog({
       }
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        {error && (
-          <p role="alert" className="sm:col-span-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-            {error}
-          </p>
-        )}
         <FormField label="Nom" className="sm:col-span-2">
           <input className={fieldClass} maxLength={100} value={form.name} onChange={(e) => set('name', e.target.value)} />
         </FormField>

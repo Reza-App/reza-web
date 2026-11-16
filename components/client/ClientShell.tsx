@@ -11,6 +11,7 @@ import { ClientOnly } from '@/components/ui/client-only';
 import { LoadingState } from '@/components/ui/states';
 import { useClientAuth } from '@/contexts/ClientAuthContext';
 import { useApiQuery } from '@/hooks/useApiQuery';
+import { broadcastLive } from '@/hooks/useLiveRefresh';
 import { clientAccount } from '@/lib/api/services/clientArea.service';
 import { formatRelative, personName } from '@/lib/format';
 import { CLIENT_LOGIN } from '@/lib/session';
@@ -30,6 +31,23 @@ function ClientBell() {
   const ref = useRef<HTMLDivElement>(null);
   const query = useApiQuery('client-notifications', (signal) => clientAccount.notifications(signal));
   const unread = query.data?.unreadCount ?? 0;
+  const { refetch } = query;
+
+  // No realtime channel for clients: check every minute while the tab is seen.
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void refetch();
+    }, 60_000);
+    return () => window.clearInterval(id);
+  }, [refetch]);
+
+  // A new message (confirmed, cancelled by the salon...) refreshes the open page.
+  const newest = query.data?.notifications[0]?.id;
+  const [lastNewest, setLastNewest] = useState(newest);
+  if (newest !== lastNewest) {
+    if (lastNewest !== undefined) broadcastLive('agenda');
+    setLastNewest(newest);
+  }
 
   useEffect(() => {
     if (!open) return;

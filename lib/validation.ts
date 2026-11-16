@@ -42,6 +42,16 @@ export function hasErrors(errors: Record<string, string | undefined>): boolean {
   return Object.values(errors).some(Boolean);
 }
 
+/**
+ * One line naming the fields to fix, shown at the bottom of a form next to the
+ * submit button (the messages under each field may be scrolled out of view).
+ */
+export function errorSummary<K extends string>(errors: FieldErrors<K>, labels: Record<K, string>): string | null {
+  const names = (Object.keys(errors) as K[]).filter((k) => errors[k]).map((k) => labels[k]);
+  if (names.length === 0) return null;
+  return names.length === 1 ? `Vérifiez le champ ${names[0]}.` : `Vérifiez les champs : ${names.join(', ')}.`;
+}
+
 /** Only internal dashboard paths are accepted as a post login destination. */
 export function safeNextPath(next: string | null | undefined, fallback = '/dashboard/rendez-vous'): string {
   if (!next || !next.startsWith('/dashboard') || next.startsWith('//') || next.includes('\\')) return fallback;

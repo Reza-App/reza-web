@@ -105,6 +105,9 @@ export interface ClientAppointment {
   address?: string | null;
   startTime: string;
   bookedFor?: string | null;
+  /** False when the client booked it for someone else. */
+  isMine?: boolean;
+  bookingGroupId?: string | null;
 }
 
 export interface Favorite {
@@ -178,17 +181,27 @@ export const discovery = {
         query: { page: 1, limit: 50 },
         signal,
       }),
-  /** Free start times ("HH:MM", salon clock) for these services and professionals. */
   /**
-   * `clientEmail`: the person the appointment is for, so their own bookings
-   * are excluded (same check as at confirmation). Omitted for a relative.
+   * Free start times ("HH:MM", salon clock) for these services and professionals.
+   * `clientEmail`: set when the client is part of the booking, so their own
+   * appointments are excluded (same check as at confirmation).
    */
-  slots: (id: string, date: string, serviceIds: string[], serviceEmployees: { serviceId: string; employeeId: string | null }[], clientEmail?: string) =>
+  slots: (
+    id: string,
+    date: string,
+    body: {
+      serviceIds: string[];
+      serviceEmployees: { serviceId: string; employeeId: string | null }[];
+      clientEmail?: string;
+      /** Group: every person at the same start time. */
+      participants?: { serviceIds: string[]; serviceEmployees: { serviceId: string; employeeId: string | null }[] }[];
+    },
+  ) =>
     api
       .post<{ slots: string[] }>(
         `${A}/tenant/${encodeURIComponent(id)}/available-slots`,
-        { date, serviceIds: serviceIds.join(','), serviceEmployees, ...(clientEmail ? { clientEmail } : {}) },
-        { query: { date, serviceIds: serviceIds.join(',') } },
+        { ...body, date, serviceIds: body.serviceIds.join(',') },
+        { query: { date, serviceIds: body.serviceIds.join(',') } },
       )
       .then((r) => r.slots ?? []),
 };
@@ -223,7 +236,7 @@ export const clientAccount = {
   addFavorite: (tenantId: string, clientEmail: string) => api.post<{ favorite?: Favorite }>(`${A}/favorites`, { tenantId, clientEmail }),
   removeFavorite: (favoriteId: string) => api.delete<void>(`${A}/favorites/${encodeURIComponent(favoriteId)}`),
   family: (signal?: AbortSignal) => api.get<{ familyMembers: FamilyMember[] }>(`${me}/family-members`, { signal }).then((r) => r.familyMembers ?? []),
-  addFamily: (input: Omit<FamilyMember, 'id'> & { clientEmail: string }) => api.post<unknown>(`${A}/family-members`, input),
+  addFamily: (input: Omit<FamilyMember, 'id'> & { clientEmail: string }) => api.post<{ familyMember?: FamilyMember }>(`${A}/family-members`, input),
   updateFamily: (id: string, input: Partial<Omit<FamilyMember, 'id'>> & { clientEmail: string }) =>
     api.put<unknown>(`${A}/family-members/${encodeURIComponent(id)}`, input),
   removeFamily: (id: string) => api.delete<void>(`${A}/family-members/${encodeURIComponent(id)}`),

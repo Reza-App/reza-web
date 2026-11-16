@@ -169,6 +169,7 @@ export function NewAppointmentDialog({
 
   return (
     <Modal
+      error={error}
       open
       size="lg"
       title="Nouveau rendez vous"
@@ -186,11 +187,6 @@ export function NewAppointmentDialog({
       }
     >
       <div className="space-y-6">
-        {error && (
-          <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-            {error}
-          </p>
-        )}
 
         <FormField label="Client" group>
           <ClientPicker selected={client} onSelect={setClient} draft={draft} onDraft={setDraft} walkIn={walkIn} onWalkIn={setWalkIn} />

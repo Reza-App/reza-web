@@ -97,6 +97,7 @@ export function EmployeeFormDialog({
 
   return (
     <Modal
+      error={error}
       open
       size="lg"
       title={employee ? 'Modifier le collaborateur' : 'Nouveau collaborateur'}
@@ -125,7 +126,6 @@ export function EmployeeFormDialog({
           </button>
         ))}
       </div>
-      {error && <p role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>}
 
       {tab === 'profil' && (
         <div className="grid gap-4 sm:grid-cols-2">
