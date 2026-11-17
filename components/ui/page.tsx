@@ -153,7 +153,7 @@ export function StatCard({
 
 export function Card({ title, actions, children, className }: { title?: string; actions?: React.ReactNode; children: React.ReactNode; className?: string }) {
   return (
-    <section className={`rounded-2xl border border-neutral-200 bg-white p-6 transition-shadow duration-200 hover:shadow-sm ${className ?? ''}`}>
+    <section className={`min-w-0 rounded-2xl border border-neutral-200 bg-white p-5 transition-shadow duration-200 hover:shadow-sm sm:p-6 ${className ?? ''}`}>
       {(title || actions) && (
         <div className="mb-5 flex items-center justify-between gap-4">
           {title && <h2 className="text-lg font-medium text-neutral-950">{title}</h2>}

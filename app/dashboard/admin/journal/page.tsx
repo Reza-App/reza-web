@@ -15,6 +15,8 @@ interface AuditLog {
   action: string;
   entityType?: string | null;
   entityId?: string | null;
+  /** Readable target from the API ("RDV de Nour Benali, 18/11 à 10:00"). */
+  entityLabel?: string | null;
   userName?: string | null;
   ip?: string | null;
   createdAt: string;
@@ -53,13 +55,13 @@ export default function AuditJournalPage() {
         {logs.length === 0 ? (
           <EmptyState title="Aucune activité enregistrée" />
         ) : (
-          <Table head={['Date', 'Action', 'Par', 'Élément', 'Adresse IP']}>
+          <Table head={['Date', 'Action', 'Par', 'Concerne', 'Adresse IP']}>
             {logs.map((log) => (
               <tr key={log.id}>
                 <td className="whitespace-nowrap px-5 py-3 text-neutral-600">{formatDateTime(log.createdAt)}</td>
                 <td className="px-5 py-3 font-medium text-neutral-950">{ACTION_LABELS[log.action] ?? log.action}</td>
                 <td className="px-5 py-3">{log.userName ?? 'Système'}</td>
-                <td className="px-5 py-3 font-mono text-xs text-neutral-500">{log.entityId ? `${log.entityType} ${log.entityId.slice(0, 10)}` : ''}</td>
+                <td className="px-5 py-3 text-neutral-700">{log.entityLabel ?? ''}</td>
                 <td className="px-5 py-3 font-mono text-xs text-neutral-500">{log.ip}</td>
               </tr>
             ))}

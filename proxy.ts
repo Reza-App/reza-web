@@ -1,9 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import {
-  CLIENT_HOME,
-  CLIENT_LOGIN,
-  CLIENT_SESSION_COOKIE,
   homeForRole,
   isTokenUsable,
   PLATFORM_HOME,
@@ -16,13 +13,6 @@ const PRIVATE_AREAS = ['/dashboard', PLATFORM_HOME];
 
 const inArea = (pathname: string, area: string) => pathname === area || pathname.startsWith(`${area}/`);
 
-/** Client area pages that need a signed in client (discovery and salon pages stay public). */
-const CLIENT_PRIVATE = ['/client/rendez-vous', '/client/favoris', '/client/proches', '/client/profil'];
-const BOOKING_RE = /^\/client\/salon\/[^/]+\/reserver\/?$/;
-function isClientPrivate(pathname: string): boolean {
-  return CLIENT_PRIVATE.some((area) => inArea(pathname, area)) || BOOKING_RE.test(pathname);
-}
-
 /**
  * Server side route guard: private areas are never rendered without a
  * session cookie, a signed in user skips the login page, and each profile is
@@ -32,18 +22,6 @@ function isClientPrivate(pathname: string): boolean {
  */
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
-
-  // Client area: its own session cookie, independent from the salon team one.
-  if (inArea(pathname, CLIENT_HOME)) {
-    const clientSignedIn = isTokenUsable(request.cookies.get(CLIENT_SESSION_COOKIE)?.value);
-    if (isClientPrivate(pathname) && !clientSignedIn) {
-      const url = new URL(CLIENT_LOGIN, request.url);
-      url.searchParams.set('next', `${pathname}${search}`);
-      return NextResponse.redirect(url);
-    }
-    if (inArea(pathname, CLIENT_LOGIN) && clientSignedIn) return NextResponse.redirect(new URL(CLIENT_HOME, request.url));
-    return NextResponse.next();
-  }
 
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   const signedIn = isTokenUsable(token);
@@ -75,5 +53,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/', '/login', '/dashboard/:path*', '/plateforme', '/plateforme/:path*', '/client', '/client/:path*'],
+  matcher: ['/', '/login', '/dashboard/:path*', '/plateforme', '/plateforme/:path*'],
 };

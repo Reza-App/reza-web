@@ -10,6 +10,7 @@ import type { AgendaSettings, Employee, Service, WorkingDay } from '@/lib/types/
 import { DAY_NAMES } from '@/lib/types/tenant';
 import { isValidEmail, isValidPhone, messages, normalizePhone } from '@/lib/validation';
 import { Select } from '@/components/ui/select';
+import { ColorSwatches } from '@/components/ui/color-swatches';
 
 const DEFAULT_HOURS: WorkingDay[] = DAY_NAMES.map((day) => ({
   day,
@@ -144,8 +145,8 @@ export function EmployeeFormDialog({
           <FormField label="Poste">
             <input className={fieldClass} maxLength={60} value={agenda.role ?? ''} onChange={(e) => setAgenda({ ...agenda, role: e.target.value })} placeholder="Coiffeuse, esthéticienne..." />
           </FormField>
-          <FormField label="Couleur de l'agenda">
-            <input type="color" className="h-[42px] w-full cursor-pointer rounded-xl border border-neutral-200 bg-white p-1" value={agenda.color ?? '#0a0a0a'} onChange={(e) => setAgenda({ ...agenda, color: e.target.value })} />
+          <FormField label="Couleur de l'agenda" group>
+            <ColorSwatches label="Couleur de l'agenda" value={agenda.color ?? '#0a0a0a'} onChange={(color) => setAgenda({ ...agenda, color })} />
           </FormField>
           <FormField label="Intervalle des créneaux">
             <Select value={agenda.timeSlotDuration} onValueChange={(v) => setAgenda({ ...agenda, timeSlotDuration: Number(v) })}>

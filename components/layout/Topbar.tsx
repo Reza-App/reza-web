@@ -112,7 +112,8 @@ export function Topbar({ onOpenMenu, menuOnDesktop = false }: { onOpenMenu: () =
 
         <span className="hidden h-8 w-px bg-neutral-200 xl:block" aria-hidden />
 
-        <div className="flex items-center gap-3">
+        {/* Name and avatar: hidden on phones, where the bar is full (menu, bell, logout). */}
+        <div className="hidden items-center gap-3 sm:flex">
           <div className="hidden max-w-48 text-right leading-tight xl:block">
             <p className="truncate whitespace-nowrap text-sm font-semibold text-neutral-950">{name}</p>
             <p className="mt-0.5 truncate whitespace-nowrap text-xs text-neutral-500">{activeSalon?.name ?? user?.email}</p>

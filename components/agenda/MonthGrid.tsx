@@ -46,7 +46,7 @@ export function MonthGrid({
           const items = (byDay.get(toISODate(day)) ?? []).sort((a, b) => a.startTime.localeCompare(b.startTime));
           const isToday = isSameDay(day, today);
           return (
-            <div key={i} className="min-h-32 border-b border-r border-neutral-100 p-2">
+            <div key={i} className={`min-h-32 border-b border-r border-neutral-100 p-2 ${isToday ? 'bg-neutral-100' : ''}`} aria-current={isToday ? 'date' : undefined}>
               <button
                 type="button"
                 onClick={() => onOpenDay(day)}

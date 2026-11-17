@@ -26,14 +26,14 @@ function BillingWatchSection() {
     <QueryBoundary loading={query.loading && !w} error={query.error} onRetry={query.refetch}>
       {w && (
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
-          <Card title="Encaissé par mois">
+          <Card title="Chiffre d'affaires par mois">
             <p className="-mt-2 mb-4 text-sm text-neutral-500">
               {formatMoney(year)} sur les 12 derniers mois, virements validés.
             </p>
             <BarChartView
               data={w.revenue.map((r) => ({ mois: monthLabel(r.month), total: r.total }))}
               x="mois"
-              series={[{ key: 'total', label: 'Encaissé' }]}
+              series={[{ key: 'total', label: "Chiffre d'affaires" }]}
               format={(v) => formatMoney(v)}
               tickFormat={(v) => (v >= 1000 ? `${(v / 1000).toLocaleString('fr-FR')} k` : String(v))}
               height={240}
@@ -101,48 +101,30 @@ export default function PlatformOverviewPage() {
           <div className="space-y-6">
             <div className="stagger stat-grid grid-cols-2 xl:grid-cols-4">
               <StatCard
-                info="Établissements inscrits sur la plateforme, actifs ou non."
+                info="Établissements inscrits sur la plateforme, dont ceux avec un abonnement en cours."
                 label="Établissements"
                 value={formatNumber(d.salons)}
-                hint={`${d.activeSalons} actifs, ${d.newSalonsThisMonth} ce mois`}
+                hint={`${d.activeSubscriptions} abonné${d.activeSubscriptions > 1 ? 's' : ''}, ${d.newSalonsThisMonth} nouveau${d.newSalonsThisMonth > 1 ? 'x' : ''} ce mois`}
               />
               <StatCard
-                info="Comptes propriétaires (un compte peut gérer plusieurs établissements)."
-                label="Comptes"
-                value={formatNumber(d.accounts)}
-                hint={`${d.activeAccounts} actifs`}
-              />
-              <StatCard
-                info="Abonnements Selia au statut actif."
-                label="Abonnements actifs"
+                info="Abonnements Selia validés depuis le début du mois."
+                label="Chiffre d'affaires"
                 tone="green"
-                value={formatNumber(d.activeSubscriptions)}
+                value={formatMoney(d.revenueThisMonth)}
+                hint={`Ce mois, ${d.paymentsThisMonth} paiement${d.paymentsThisMonth > 1 ? 's' : ''}`}
               />
               <StatCard
-                info="Paiements d'abonnement déclarés par les établissements et pas encore vérifiés."
+                info="Virements déclarés par les établissements et pas encore vérifiés."
                 label="Paiements à vérifier"
                 tone={d.pendingPayments > 0 ? 'amber' : 'default'}
                 badge={d.pendingPayments > 0 ? { label: 'À traiter', tone: 'amber' } : undefined}
                 value={formatNumber(d.pendingPayments)}
               />
               <StatCard
-                info="Paiements d'abonnement validés depuis le début du mois."
-                label="Encaissé ce mois"
-                tone="green"
-                value={formatMoney(d.revenueThisMonth)}
-                hint={`${d.paymentsThisMonth} paiement${d.paymentsThisMonth > 1 ? 's' : ''} validé${d.paymentsThisMonth > 1 ? 's' : ''}`}
-              />
-              <StatCard
                 info="Rendez vous du mois en cours sur tous les établissements, hors annulations."
                 label="Rendez vous ce mois"
                 value={formatNumber(d.appointmentsThisMonth)}
-              />
-              <StatCard info="Fiches clients sur l'ensemble des établissements." label="Clients" value={formatNumber(d.clients)} />
-              <StatCard
-                info="Établissements mis en avant sur l'accueil de l'application client."
-                label="Mis en avant"
-                tone="violet"
-                value={formatNumber(d.featuredSalons)}
+                hint={`${formatNumber(d.clients)} clients au total`}
               />
             </div>
 

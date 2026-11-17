@@ -97,7 +97,11 @@ export default function PlatformInvoicesPage() {
           <Table head={['Numéro', 'Date', 'Établissement', 'Période', 'Statut', 'Montant']}>
             {invoices.map((i, index) => (
               <tr key={i.id} className={pager.rowClass(index)}>
-                <td className="px-5 py-3 font-medium text-neutral-950">{i.invoiceNumber}</td>
+                <td className="px-5 py-3 font-medium text-neutral-950">
+                  <Link href={`/plateforme/factures/${encodeURIComponent(i.id)}`} className="hover:underline">
+                    {i.invoiceNumber}
+                  </Link>
+                </td>
                 <td className="whitespace-nowrap px-5 py-3">{formatDate(i.createdAt)}</td>
                 <td className="px-5 py-3">
                   {i.accountId ? (

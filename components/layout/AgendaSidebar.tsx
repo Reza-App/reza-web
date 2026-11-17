@@ -3,7 +3,7 @@
 import { ChevronLeft, ChevronRight, Filter, UserCheck } from 'lucide-react';
 import { useUrlState } from '@/hooks/useUrlState';
 import { useEmployees } from '@/hooks/useReferenceData';
-import { monthGrid, parseAgendaFilters } from '@/lib/agenda';
+import { DEFAULT_AGENDA_VIEW, monthGrid, parseAgendaFilters } from '@/lib/agenda';
 import { isSameDay, personName, toISODate } from '@/lib/format';
 import { STATUS_LABELS, type AppointmentStatus } from '@/lib/types/appointment';
 import { APPOINTMENT_STATUS_TONES, STATUS_DOT, statusTone } from '@/lib/status';
@@ -32,6 +32,14 @@ export function AgendaSidebar() {
   const { data: employees } = useEmployees();
   const today = new Date();
   const cells = monthGrid(filters.date);
+
+  // In month view no day is "picked": the month is shown as a whole.
+  const picked = (day: Date) => filters.view !== 'month' && isSameDay(day, filters.date);
+  // A day opens its day view; clicking the opened day again goes back to the month.
+  const pickDay = (day: Date) =>
+    filters.view === 'day' && isSameDay(day, filters.date)
+      ? set({ view: DEFAULT_AGENDA_VIEW === 'month' ? null : 'month', date: toISODate(day) })
+      : set({ view: 'day', date: toISODate(day) });
 
   const goMonth = (delta: number) => {
     const d = new Date(filters.date.getFullYear(), filters.date.getMonth() + delta, 1);
@@ -65,10 +73,11 @@ export function AgendaSidebar() {
               <button
                 key={i}
                 type="button"
-                onClick={() => set({ date: toISODate(day) })}
-                aria-pressed={isSameDay(day, filters.date)}
+                onClick={() => pickDay(day)}
+                aria-pressed={picked(day)}
+                title={filters.view === 'day' && isSameDay(day, filters.date) ? 'Revenir au mois' : 'Voir ce jour'}
                 className={`aspect-square rounded-full text-xs font-medium transition-colors ${
-                  isSameDay(day, filters.date)
+                  picked(day)
                     ? 'bg-neutral-950 text-white'
                     : isSameDay(day, today)
                       ? 'text-neutral-950 ring-1 ring-neutral-950'

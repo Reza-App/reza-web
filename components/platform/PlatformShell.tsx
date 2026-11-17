@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Building2,
   ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   CreditCard,
   FileText,
   Gauge,
@@ -63,15 +65,50 @@ const SECTIONS = [
   },
 ];
 
+/** Folded sidebar, remembered per browser (same approach as the salon dashboard). */
+const FOLD_KEY = 'selia.platformSidebarFolded';
+const FOLD_EVENT = 'selia:platform-sidebar';
+
+function readFolded(): boolean {
+  try {
+    return window.localStorage.getItem(FOLD_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeFolded(value: boolean) {
+  try {
+    window.localStorage.setItem(FOLD_KEY, value ? '1' : '0');
+  } catch {
+    // Storage blocked: the choice is simply not remembered.
+  }
+  window.dispatchEvent(new Event(FOLD_EVENT));
+}
+
+function subscribeFolded(onChange: () => void) {
+  window.addEventListener(FOLD_EVENT, onChange);
+  window.addEventListener('storage', onChange);
+  return () => {
+    window.removeEventListener(FOLD_EVENT, onChange);
+    window.removeEventListener('storage', onChange);
+  };
+}
+
 const isActive = (pathname: string, href: string) =>
   href === '/plateforme' ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 
-function SidebarNav({ pathname }: { pathname: string }) {
+/** Full list, or icons only when the sidebar is folded (label as tooltip). */
+function SidebarNav({ pathname, folded = false }: { pathname: string; folded?: boolean }) {
   return (
-    <nav className="flex-1 space-y-6 overflow-y-auto px-4 py-6" aria-label="Navigation plateforme">
+    <nav className={`flex-1 overflow-y-auto py-6 ${folded ? 'space-y-4 px-3' : 'space-y-6 px-4'}`} aria-label="Navigation plateforme">
       {SECTIONS.map((section) => (
         <div key={section.title}>
-          <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-400">{section.title}</p>
+          {folded ? (
+            <div className="mx-auto mb-2 h-px w-6 bg-neutral-200" aria-hidden />
+          ) : (
+            <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-400">{section.title}</p>
+          )}
           <ul className="space-y-0.5">
             {section.links.map(({ name, href, icon: Icon }) => {
               const active = isActive(pathname, href);
@@ -80,12 +117,14 @@ function SidebarNav({ pathname }: { pathname: string }) {
                   <Link
                     href={href}
                     aria-current={active ? 'page' : undefined}
-                    className={`flex items-center gap-3 rounded-full px-3 py-2.5 text-sm transition-colors ${
+                    aria-label={folded ? name : undefined}
+                    title={folded ? name : undefined}
+                    className={`flex items-center rounded-full text-sm transition-colors ${folded ? 'mx-auto h-11 w-11 justify-center' : 'gap-3 px-3 py-2.5'} ${
                       active ? 'bg-neutral-950 text-white' : 'text-neutral-700 hover:bg-neutral-100 hover:text-neutral-950'
                     }`}
                   >
-                    <Icon size={17} />
-                    {name}
+                    <Icon size={folded ? 19 : 17} />
+                    {!folded && name}
                   </Link>
                 </li>
               );
@@ -165,6 +204,10 @@ export function PlatformShell({ children }: { children: React.ReactNode }) {
   const name = fullName(user);
   const [drawer, setDrawer] = useState(false);
 
+  // Folded sidebar (icons only), remembered by this browser.
+  const folded = useSyncExternalStore(subscribeFolded, readFolded, () => false);
+  const toggleFolded = writeFolded;
+
   // Navigating closes the phone drawer.
   const [lastPath, setLastPath] = useState(pathname);
   if (lastPath !== pathname) {
@@ -182,11 +225,31 @@ export function PlatformShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-white">
       {/* Desktop sidebar */}
-      <aside className="no-print sticky top-0 hidden h-screen w-[264px] shrink-0 flex-col border-r border-neutral-200 bg-white lg:flex">
-        <div className="flex h-20 items-center border-b border-neutral-100 px-6">
-          <Brand />
+      <aside
+        className={`no-print sticky top-0 hidden h-screen shrink-0 flex-col border-r border-neutral-200 bg-white transition-[width] duration-200 lg:flex ${folded ? 'w-[76px]' : 'w-[264px]'}`}
+      >
+        <div className={`flex h-20 items-center border-b border-neutral-100 ${folded ? 'justify-center px-2' : 'justify-between px-6'}`}>
+          {folded ? (
+            <Link href="/plateforme" aria-label="Plateforme Selia">
+              <Logo variant="pro" height={24} />
+            </Link>
+          ) : (
+            <Brand />
+          )}
+          {!folded && (
+            <button type="button" onClick={() => toggleFolded(true)} className="rounded-full p-2 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-950" aria-label="Replier le menu" title="Replier le menu">
+              <ChevronsLeft size={18} />
+            </button>
+          )}
         </div>
-        <SidebarNav pathname={pathname} />
+        {folded && (
+          <div className="border-b border-neutral-100 py-3">
+            <button type="button" onClick={() => toggleFolded(false)} className="mx-auto flex h-11 w-11 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-100 hover:text-neutral-950" aria-label="Afficher le menu" title="Afficher le menu">
+              <ChevronsRight size={19} />
+            </button>
+          </div>
+        )}
+        <SidebarNav pathname={pathname} folded={folded} />
       </aside>
 
       {/* Phone drawer */}

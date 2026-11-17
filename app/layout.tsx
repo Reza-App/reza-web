@@ -3,6 +3,7 @@ import localFont from 'next/font/local';
 import { Red_Hat_Display, Red_Hat_Mono } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { ErrorReporter } from '@/components/ErrorReporter';
 import { ToastProvider } from '@/components/ui/toast';
 
 const redHatDisplay = Red_Hat_Display({
@@ -27,6 +28,8 @@ const futura = localFont({
 });
 
 export const metadata: Metadata = {
+  // Absolute links for previews and canonical URLs (set NEXT_PUBLIC_SITE_URL in production).
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'),
   title: {
     default: 'Selia Pro',
     template: '%s | Selia Pro',
@@ -40,6 +43,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="fr">
       <body className={`${redHatDisplay.variable} ${redHatMono.variable} ${futura.variable} antialiased`}>
+        <ErrorReporter />
         <AuthProvider>
           <ToastProvider>{children}</ToastProvider>
         </AuthProvider>

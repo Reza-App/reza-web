@@ -8,6 +8,7 @@ import { errorMessage } from '@/lib/api/errors';
 import { personName } from '@/lib/format';
 import type { Employee, Service } from '@/lib/types/catalog';
 import { Select } from '@/components/ui/select';
+import { ColorSwatches } from '@/components/ui/color-swatches';
 
 type PriceType = 'FIXED' | 'FROM' | 'RANGE';
 
@@ -138,8 +139,8 @@ export function ServiceFormDialog({
             ))}
           </Select>
         </FormField>
-        <FormField label="Couleur">
-          <input type="color" className="h-[42px] w-full cursor-pointer rounded-xl border border-neutral-200 bg-white p-1" value={form.color} onChange={(e) => set('color', e.target.value)} />
+        <FormField label="Couleur" group>
+          <ColorSwatches label="Couleur" value={form.color} onChange={(color) => set('color', color)} />
         </FormField>
         <FormField label="Tarif">
           <Select value={form.priceType} onValueChange={(v) => set('priceType', v as PriceType)} disabled={form.onQuote}>

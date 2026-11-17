@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Eye } from 'lucide-react';
+import { Eye, Plus } from 'lucide-react';
+import { NewEstablishmentDialog } from '@/components/platform/NewEstablishmentDialog';
+import { PrimaryButton } from '@/components/ui/modal';
 import { Badge, PageHeader, Pagination, SearchInput, Table } from '@/components/ui/page';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { EmptyState, QueryBoundary } from '@/components/ui/states';
@@ -33,6 +35,7 @@ export default function PlatformSalonsPage() {
   const salons = query.data?.salons ?? [];
   const [busyId, setBusyId] = useState<string | null>(null);
   const [toggling, setToggling] = useState<PlatformSalon | null>(null);
+  const [creating, setCreating] = useState(false);
 
   const patchSalon = (id: string, patch: Partial<PlatformSalon>) =>
     query.setData((d) => d && { ...d, salons: d.salons.map((s) => (s.id === id ? { ...s, ...patch } : s)) });
@@ -70,7 +73,16 @@ export default function PlatformSalonsPage() {
 
   return (
     <div>
-      <PageHeader title="Établissements" description="Tous les établissements inscrits sur Selia, leur activité et leur visibilité." />
+      <PageHeader
+        title="Établissements"
+        description="Tous les établissements inscrits sur Selia, leur activité et leur visibilité."
+        actions={
+          <PrimaryButton onClick={() => setCreating(true)}>
+            <Plus size={16} /> Créer un établissement
+          </PrimaryButton>
+        }
+      />
+      {creating && <NewEstablishmentDialog onClose={() => setCreating(false)} onCreated={() => void query.refetch()} />}
 
       <div className="mb-5 max-w-md">
         <SearchInput value={search} onChange={setSearch} placeholder="Nom, ville ou email du propriétaire" />

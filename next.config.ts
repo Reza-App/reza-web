@@ -36,6 +36,29 @@ const nextConfig: NextConfig = {
   agentRules: false,
   images: { qualities: [75, 90] },
   /**
+   * The client area moved to its own site (landing_client): old links,
+   * emails and bookmarks land on the matching page there.
+   */
+  async redirects() {
+    const client = (process.env.NEXT_PUBLIC_CLIENT_URL ?? 'http://localhost:3100').replace(/\/+$/, '');
+    const moved: [string, string][] = [
+      ['/client', '/'],
+      ['/client/connexion', '/connexion'],
+      ['/client/inscription', '/inscription'],
+      ['/client/mot-de-passe', '/mot-de-passe'],
+      ['/client/verify-email', '/verify-email'],
+      ['/client/confidentialite', '/confidentialite'],
+      ['/client/rendez-vous', '/compte/rendez-vous'],
+      ['/client/favoris', '/compte/favoris'],
+      ['/client/proches', '/compte/proches'],
+      ['/client/profil', '/compte/profil'],
+      ['/client/salon/:id', '/salon/:id'],
+      ['/client/salon/:id/reserver', '/salon/:id/reserver'],
+      ['/client/:path*', '/'],
+    ];
+    return moved.map(([source, to]) => ({ source, destination: `${client}${to}`, permanent: true }));
+  },
+  /**
    * Realtime relay: Socket.IO (long polling) goes through this origin, so the
    * browser never learns the backend address and connect-src stays 'self'.
    * The client opens it with a 60 s ticket, never with the session token.

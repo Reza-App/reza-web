@@ -61,17 +61,8 @@ export function readTokenClaims(token: string | undefined): Record<string, unkno
   }
 }
 
-/** Client (app user) session, kept apart from the salon team session. */
-export const CLIENT_SESSION_COOKIE = 'selia_client';
-export const CLIENT_HOME = '/client';
-export const CLIENT_LOGIN = '/client/connexion';
-
-/** Email of a client token, used to address the /client/:email API routes. */
-export function readClientEmail(token: string | undefined): string | null {
-  const claims = readTokenClaims(token);
-  if (!claims || claims.role !== 'CLIENT' || typeof claims.email !== 'string') return null;
-  return claims.email.toLowerCase();
-}
+/** Public client site (separate app): discovery, booking and client accounts. */
+export const CLIENT_SITE_URL = (process.env.NEXT_PUBLIC_CLIENT_URL ?? 'http://localhost:3100').replace(/\/+$/, '');
 
 /** Platform administrators work in /plateforme, salons in /dashboard. */
 export const PLATFORM_HOME = '/plateforme';

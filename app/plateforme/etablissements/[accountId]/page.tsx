@@ -15,14 +15,18 @@ import { errorMessage } from '@/lib/api/errors';
 import { type AccountDetail, PAYMENT_STATUS_LABELS, type SubscriptionChange, platformService } from '@/lib/api/services/platform.service';
 import { subscriptionState } from '@/lib/billing';
 import { formatDate, formatMoney, formatNumber, personName, toISODate } from '@/lib/format';
+import { CLIENT_SITE_URL } from '@/lib/session';
 import { PAYMENT_STATUS_TONES, statusTone } from '@/lib/status';
+import { durationLabel, type Plan, PLAN_DURATIONS, PLAN_LABELS } from '@/lib/plans';
 
-/** Extend, set the end date, cancel or reactivate the subscription of an account. */
+/** Extend, set the end date or the plan of an account's subscription. */
 function SubscriptionDialog({ detail, onClose, onSaved }: { detail: AccountDetail; onClose: () => void; onSaved: (d: AccountDetail) => void }) {
   const toast = useToast();
   const sub = detail.subscription;
-  const [mode, setMode] = useState<'extend' | 'setEnd'>('extend');
+  const [mode, setMode] = useState<'extend' | 'setEnd' | 'plan'>('extend');
   const [months, setMonths] = useState('1');
+  const [plan, setPlan] = useState<Plan>(sub?.plan ?? 'SALON');
+  const [planMonths, setPlanMonths] = useState(String(sub?.periodMonths ?? 1));
   const [date, setDate] = useState(sub?.currentPeriodEnd ? toISODate(new Date(sub.currentPeriodEnd)) : '');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -32,7 +36,12 @@ function SubscriptionDialog({ detail, onClose, onSaved }: { detail: AccountDetai
     setBusy(true);
     setError(null);
     try {
-      const change: SubscriptionChange = mode === 'extend' ? { action: 'extend', months: Number(months) } : { action: 'setEnd', date: `${date}T12:00:00.000Z` };
+      const change: SubscriptionChange =
+        mode === 'extend'
+          ? { action: 'extend', months: Number(months) }
+          : mode === 'plan'
+            ? { action: 'setPlan', plan, months: Number(planMonths) }
+            : { action: 'setEnd', date: `${date}T12:00:00.000Z` };
       onSaved(await platformService.changeSubscription(detail.account.id, change));
       toast.success('Abonnement mis à jour. Le propriétaire a été prévenu.');
       onClose();
@@ -69,7 +78,8 @@ function SubscriptionDialog({ detail, onClose, onSaved }: { detail: AccountDetai
           {(
             [
               ['extend', 'Prolonger'],
-              ['setEnd', 'Fixer la date de fin'],
+              ['setEnd', 'Date de fin'],
+              ['plan', 'Plan'],
             ] as const
           ).map(([value, label]) => (
             <button
@@ -83,7 +93,33 @@ function SubscriptionDialog({ detail, onClose, onSaved }: { detail: AccountDetai
             </button>
           ))}
         </div>
-        {mode === 'extend' ? (
+        {mode === 'plan' ? (
+          <div className="space-y-4">
+            <FormField label="Plan" hint="S'applique au prochain paiement (renouvellement ou première période).">
+              <Select
+                value={plan}
+                onValueChange={(v) => {
+                  const next = v as Plan;
+                  setPlan(next);
+                  if (!PLAN_DURATIONS[next].includes(Number(planMonths))) setPlanMonths(String(PLAN_DURATIONS[next][0]));
+                }}
+                aria-label="Plan"
+              >
+                <option value="SALON">Salon</option>
+                <option value="FREELANCE">Freelance</option>
+              </Select>
+            </FormField>
+            <FormField label="Durée de la période">
+              <Select value={planMonths} onValueChange={setPlanMonths} aria-label="Durée de la période">
+                {PLAN_DURATIONS[plan].map((m) => (
+                  <option key={m} value={String(m)}>
+                    {durationLabel(m)}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+          </div>
+        ) : mode === 'extend' ? (
           <FormField label="Durée" hint="Ajoutée à la fin actuelle, ou à aujourd'hui si elle est passée.">
             <Select value={months} onValueChange={setMonths} aria-label="Durée">
               {[1, 2, 3, 6, 12].map((m) => (
@@ -177,15 +213,15 @@ export default function PlatformAccountPage({ params }: { params: Promise<{ acco
             </div>
 
             <div className="stagger stat-grid grid-cols-2 xl:grid-cols-4">
+              <StatCard label="Plan" value={PLAN_LABELS[sub?.plan ?? 'SALON']} hint={durationLabel(sub?.periodMonths ?? 1)} />
               <StatCard label="Fin de période" value={formatDate(sub?.currentPeriodEnd) || '-'} />
               <StatCard label={data.bill?.renewalDue ? 'Prochaine période' : 'Reste à régler'} value={formatMoney(data.bill?.total ?? 0)} />
-              <StatCard label="Salons publiés" value={`${data.salons.filter((s) => s.visible).length} / ${data.salons.length}`} />
               <StatCard label="Encaissé au total" value={formatMoney(data.payments.filter((p) => p.status === 'APPROVED').reduce((t, p) => t + p.amount, 0))} />
             </div>
 
             <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
               <Card title="Salons">
-                <Table head={['Salon', 'Collaborateurs', 'RDV', 'Clients', 'Activation', 'Visibilité']}>
+                <Table head={['Salon', 'Collaborateurs', 'RDV', 'Clients', 'Inclus', 'Visibilité']}>
                   {data.salons.map((s) => (
                     <tr key={s.id}>
                       <td className="px-5 py-3">
@@ -193,13 +229,16 @@ export default function PlatformAccountPage({ params }: { params: Promise<{ acco
                         <p className="text-xs text-neutral-500">
                           {s.city || 'Ville non renseignée'}
                           {s.slug && (
-                            <a href={`/client/salon/${encodeURIComponent(s.slug)}`} target="_blank" rel="noreferrer" className="ml-2 inline-flex items-center gap-1 whitespace-nowrap underline">
+                            <a href={`${CLIENT_SITE_URL}/salon/${encodeURIComponent(s.slug)}`} target="_blank" rel="noreferrer" className="ml-2 inline-flex items-center gap-1 whitespace-nowrap underline">
                               Fiche publique <ExternalLink size={11} />
                             </a>
                           )}
                         </p>
                       </td>
-                      <td className="px-5 py-3 tabular-nums">{s.employees}</td>
+                      <td className="px-5 py-3 tabular-nums">
+                        {s.employees}
+                        <span className="block text-xs text-neutral-500">{s.employeesPaid} payé{s.employeesPaid > 1 ? 's' : ''}</span>
+                      </td>
                       <td className="px-5 py-3 tabular-nums">{formatNumber(s.appointments)}</td>
                       <td className="px-5 py-3 tabular-nums">{formatNumber(s.clients)}</td>
                       <td className="px-5 py-3">
@@ -207,12 +246,12 @@ export default function PlatformAccountPage({ params }: { params: Promise<{ acco
                           <Switch
                             checked={s.salonCovered}
                             disabled={busy === s.id}
-                            label={`Activation réglée pour ${s.name}`}
+                            label={`${s.name} inclus dans l'abonnement`}
                             onChange={(covered) =>
-                              void run(s.id, () => platformService.setSalonCovered(s.id, covered), covered ? `Activation offerte à ${s.name}.` : `Activation retirée à ${s.name}.`)
+                              void run(s.id, () => platformService.setSalonCovered(s.id, covered), covered ? `${s.name} est inclus dans l'abonnement.` : `${s.name} n'est plus inclus.`)
                             }
                           />
-                          <span className="whitespace-nowrap text-xs text-neutral-500">{s.salonCovered ? 'Réglée' : 'À régler'}</span>
+                          <span className="whitespace-nowrap text-xs text-neutral-500">{s.salonCovered ? 'Oui' : 'Non'}</span>
                         </div>
                       </td>
                       <td className="px-5 py-3">
@@ -222,8 +261,8 @@ export default function PlatformAccountPage({ params }: { params: Promise<{ acco
                   ))}
                 </Table>
                 <p className="mt-3 flex items-center gap-1.5 text-xs text-neutral-500">
-                  <Gift size={13} /> Cocher « Activation » offre les frais d&apos;activation sans virement. Un salon est visible quand son activation est réglée et
-                  l&apos;abonnement en cours.
+                  <Gift size={13} /> Un salon est visible quand il est inclus dans un abonnement en cours ({data.salons.filter((s) => s.visible).length} sur{' '}
+                  {data.salons.length}). Le cocher l&apos;inclut sans virement.
                 </p>
               </Card>
 
@@ -275,7 +314,11 @@ export default function PlatformAccountPage({ params }: { params: Promise<{ acco
                   <Table head={['Numéro', 'Période', 'Montant']}>
                     {data.invoices.map((i) => (
                       <tr key={i.id}>
-                        <td className="px-5 py-3 font-medium text-neutral-950">{i.invoiceNumber}</td>
+                        <td className="px-5 py-3 font-medium text-neutral-950">
+                          <Link href={`/plateforme/factures/${encodeURIComponent(i.id)}`} className="hover:underline">
+                            {i.invoiceNumber}
+                          </Link>
+                        </td>
                         <td className="px-5 py-3 text-neutral-600">{i.periodStart ? `${formatDate(i.periodStart)} au ${formatDate(i.periodEnd)}` : '-'}</td>
                         <td className="px-5 py-3 tabular-nums">{formatMoney(i.total)}</td>
                       </tr>

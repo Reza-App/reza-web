@@ -11,27 +11,18 @@ const DEFAULT_FIELDS: DisplayField[] = [
   { id: 'notes', label: 'Note', visible: false, order: 4 },
 ];
 
-const STATUS_STYLE: Record<string, string> = {
-  PENDING: 'border-dashed border-neutral-400 bg-white text-neutral-900',
-  CONFIRMED: 'border-neutral-900 bg-white text-neutral-950',
-  IN_PROGRESS: 'border-neutral-950 bg-neutral-950 text-white',
-  COMPLETED: 'border-neutral-200 bg-neutral-100 text-neutral-700',
-  CANCELLED: 'border-neutral-200 bg-neutral-50 text-neutral-400 line-through',
-  NO_SHOW: 'border-neutral-300 bg-neutral-50 text-neutral-500',
-};
+const NEUTRAL = '#0a0a0a';
+const VALID_HEX = /^#[0-9a-f]{6}$/i;
 
-/** Light tint of a hex colour for the card background. */
-function tint(hex: string | undefined | null) {
-  if (!hex || !/^#[0-9a-f]{6}$/i.test(hex)) return undefined;
+function rgba(hex: string, alpha: number) {
   const r = parseInt(hex.slice(1, 3), 16);
   const g = parseInt(hex.slice(3, 5), 16);
   const b = parseInt(hex.slice(5, 7), 16);
-  return {
-    backgroundColor: `rgba(${r}, ${g}, ${b}, 0.12)`,
-    borderColor: `rgba(${r}, ${g}, ${b}, 0.55)`,
-    borderLeft: `3px solid ${hex}`,
-  };
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
+
+/** Cancelled and no show appointments lose their colour: they no longer take the slot. */
+const isOff = (status: string) => status === 'CANCELLED' || status === 'NO_SHOW';
 
 export function AppointmentCard({
   appointment,
@@ -53,10 +44,51 @@ export function AppointmentCard({
   const fields = [...(display?.fields?.length ? display.fields : DEFAULT_FIELDS)]
     .filter((f) => f.visible)
     .sort((a, b) => a.order - b.order);
-  const useColor = (display?.showColorInRDV ?? true) && !['CANCELLED', 'NO_SHOW'].includes(appointment.status);
-  const colorStyle = useColor ? tint(color) : undefined;
+  const off = isOff(appointment.status);
+  const showColor = (display?.showColorInRDV ?? true) && !!color && VALID_HEX.test(color);
+  const accent = off ? '#a3a3a3' : showColor ? color! : NEUTRAL;
+  const pending = appointment.status === 'PENDING';
+  const inProgress = appointment.status === 'IN_PROGRESS';
   const start = new Date(appointment.startTime);
   const end = new Date(appointment.endTime);
+  const title = `${appointmentClientName(appointment)} : ${serviceSummary(appointment)} (${statusLabel(appointment.status)})`;
+  const dragProps = {
+    draggable,
+    onDragStart: (e: React.DragEvent) => {
+      e.dataTransfer.setData('text/appointment-id', appointment.id);
+      e.dataTransfer.effectAllowed = 'move';
+    },
+  };
+
+  // Month view: one light line, a dot in the collaborator's colour.
+  if (compact) {
+    return (
+      <button
+        type="button"
+        {...dragProps}
+        onClick={() => onOpen(appointment)}
+        title={title}
+        style={style}
+        className={`flex w-full items-center gap-1.5 rounded-md px-1.5 py-[3px] text-left text-xs transition hover:bg-neutral-100 ${draggable ? 'cursor-grab active:cursor-grabbing' : ''}`}
+      >
+        <span
+          aria-hidden
+          className="h-2 w-2 shrink-0 rounded-full"
+          style={pending || off ? { boxShadow: `inset 0 0 0 1.5px ${accent}` } : { backgroundColor: accent }}
+        />
+        <span className={`shrink-0 tabular-nums ${off ? 'text-neutral-400' : 'text-neutral-500'}`}>{toTimeLabel(start)}</span>
+        <span className={`truncate ${off ? 'text-neutral-400 line-through' : 'font-medium text-neutral-900'}`}>{appointmentClientName(appointment) || 'Client'}</span>
+      </button>
+    );
+  }
+
+  // Day and week views: flat block, light tint and a coloured edge.
+  const blockStyle: React.CSSProperties = inProgress
+    ? { backgroundColor: accent, borderLeft: `3px solid ${accent}` }
+    : {
+        backgroundColor: off ? '#f5f5f5' : rgba(accent, showColor ? 0.1 : 0.05),
+        borderLeft: `3px ${pending ? 'dashed' : 'solid'} ${accent}`,
+      };
 
   const render = (field: DisplayField) => {
     switch (field.id) {
@@ -92,25 +124,15 @@ export function AppointmentCard({
   return (
     <button
       type="button"
-      draggable={draggable}
-      onDragStart={(e) => {
-        e.dataTransfer.setData('text/appointment-id', appointment.id);
-        e.dataTransfer.effectAllowed = 'move';
-      }}
+      {...dragProps}
       onClick={() => onOpen(appointment)}
-      title={`${appointmentClientName(appointment)} : ${serviceSummary(appointment)} (${statusLabel(appointment.status)})`}
-      style={{ ...colorStyle, ...style }}
-      className={`flex w-full flex-col items-stretch justify-start overflow-hidden rounded-lg border px-2 py-1 text-left text-xs leading-snug shadow-sm transition hover:shadow-md ${
-        colorStyle ? 'text-neutral-950' : STATUS_STYLE[appointment.status] ?? STATUS_STYLE.CONFIRMED
+      title={title}
+      style={{ ...blockStyle, ...style }}
+      className={`flex w-full flex-col items-stretch justify-start overflow-hidden rounded-md px-2 py-1 text-left text-xs leading-snug transition hover:brightness-95 ${
+        inProgress ? 'text-white' : off ? 'text-neutral-400 line-through' : 'text-neutral-950'
       } ${draggable ? 'cursor-grab active:cursor-grabbing' : ''}`}
     >
-      {compact ? (
-        <span className="block truncate">
-          <span className="tabular-nums opacity-70">{toTimeLabel(start)}</span> {appointmentClientName(appointment)}
-        </span>
-      ) : (
-        fields.map(render)
-      )}
+      {fields.map(render)}
     </button>
   );
 }

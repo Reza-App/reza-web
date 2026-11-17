@@ -107,6 +107,79 @@ async function save(p: Profile) {
   ]);
 }
 
+/**
+ * Salon types: the filters of the client app plus "Institut de beauté". A
+ * salon in one of them shows up in that filter; "Autre" lets the salon write
+ * its own.
+ */
+const SALON_TYPES = ['Coiffeur', 'Barbier', 'Institut de beauté', 'Esthétique', 'Manucure', 'Pédicure', 'Épilation', 'Maquillage', 'Massage', 'Spa', 'Hammam', 'Soin', 'Couleur'];
+const MAX_CATEGORIES = 6;
+
+/** Stored as one text, "Coiffeur, Barbier": the client filters match each part. */
+const splitCategories = (value: string) =>
+  value
+    .split(',')
+    .map((c) => c.trim())
+    .filter(Boolean);
+
+function CategoryField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const list = splitCategories(value);
+  const [draft, setDraft] = useState('');
+  const has = (c: string) => list.some((x) => x.toLowerCase() === c.toLowerCase());
+  const full = list.length >= MAX_CATEGORIES;
+  const set = (next: string[]) => onChange(next.join(', '));
+  const toggle = (c: string) => (has(c) ? set(list.filter((x) => x.toLowerCase() !== c.toLowerCase())) : !full && set([...list, c]));
+  const custom = list.filter((c) => !SALON_TYPES.some((t) => t.toLowerCase() === c.toLowerCase()));
+  const addOther = () => {
+    const c = draft.replace(/,/g, ' ').trim();
+    if (!c || has(c) || full) return;
+    set([...list, c]);
+    setDraft('');
+  };
+  const chip = (active: boolean) =>
+    `rounded-full border px-3 py-1.5 text-sm transition ${active ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 text-neutral-700 hover:border-neutral-400'}`;
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Catégories">
+        {SALON_TYPES.map((t) => (
+          <button key={t} type="button" aria-pressed={has(t)} disabled={!has(t) && full} onClick={() => toggle(t)} className={`${chip(has(t))} disabled:opacity-40`}>
+            {t}
+          </button>
+        ))}
+        {custom.map((c) => (
+          <button key={c} type="button" aria-pressed onClick={() => toggle(c)} className={`${chip(true)} flex items-center gap-1`} aria-label={`Retirer ${c}`}>
+            {c}
+            <X size={13} />
+          </button>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <input
+          className={fieldClass}
+          maxLength={40}
+          placeholder="Autre catégorie"
+          aria-label="Autre catégorie"
+          value={draft}
+          disabled={full}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              addOther();
+            }
+          }}
+        />
+        <SecondaryButton type="button" onClick={addOther} disabled={full || !draft.trim()} aria-label="Ajouter la catégorie">
+          <Plus size={15} />
+        </SecondaryButton>
+      </div>
+      <p className="text-xs text-neutral-500">
+        {list.length ? `${list.length} sélectionnée${list.length > 1 ? 's' : ''}` : 'Aucune catégorie'}, {MAX_CATEGORIES} au maximum. Votre salon apparaît dans chaque filtre choisi.
+      </p>
+    </div>
+  );
+}
+
 export default function SalonProfilePage() {
   const form = useSettingsForm('salon-profile', load, save, 'Descriptif enregistré.');
   const [amenity, setAmenity] = useState('');
@@ -132,8 +205,8 @@ export default function SalonProfilePage() {
                   <FormField label="Nom du salon" className="sm:col-span-2">
                     <input className={fieldClass} maxLength={100} {...bind('name')} />
                   </FormField>
-                  <FormField label="Catégorie">
-                    <input className={fieldClass} maxLength={60} {...bind('category')} />
+                  <FormField label="Catégories" className="sm:col-span-2" group>
+                    <CategoryField value={p.category} onChange={(category) => form.setDraft((d) => d && { ...d, category })} />
                   </FormField>
                   <FormField label="Ville">
                     <input className={fieldClass} maxLength={60} {...bind('city')} />

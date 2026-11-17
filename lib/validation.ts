@@ -57,12 +57,3 @@ export function safeNextPath(next: string | null | undefined, fallback = '/dashb
   if (!next || !next.startsWith('/dashboard') || next.startsWith('//') || next.includes('\\')) return fallback;
   return next;
 }
-
-/** Client accounts: 6 characters minimum, as in the app and the API. */
-export const CLIENT_PASSWORD_MIN_LENGTH = 6;
-
-/** Only client area paths are accepted after a client sign in. */
-export function safeClientNext(next: string | null | undefined, fallback = '/client'): string {
-  if (!next || !next.startsWith('/client') || next.startsWith('//') || next.includes('\\') || next.startsWith('/client/connexion')) return fallback;
-  return next;
-}

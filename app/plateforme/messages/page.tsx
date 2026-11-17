@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Send } from 'lucide-react';
+import { Download, Send } from 'lucide-react';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { FormField, PrimaryButton, fieldClass } from '@/components/ui/modal';
 import { Card, PageHeader } from '@/components/ui/page';
@@ -11,7 +11,47 @@ import { useToast } from '@/components/ui/toast';
 import { useApiQuery } from '@/hooks/useApiQuery';
 import { errorMessage } from '@/lib/api/errors';
 import { platformService } from '@/lib/api/services/platform.service';
-import { formatDateTime } from '@/lib/format';
+import { downloadCsv } from '@/lib/csv';
+import { formatDate, formatDateTime } from '@/lib/format';
+
+/** Emails left in the client site footer, with a CSV export for a mailing tool. */
+function NewsletterCard() {
+  const query = useApiQuery('platform-newsletter', (signal) => platformService.newsletter(signal));
+  const list = query.data ?? [];
+  const exportCsv = () =>
+    downloadCsv(
+      `newsletter-selia-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Email', 'Inscrit le'],
+      list.map((s) => [s.email, formatDate(s.createdAt)]),
+    );
+  return (
+    <Card
+      title={`Newsletter du site client${query.data ? ` (${list.length})` : ''}`}
+      actions={
+        list.length > 0 ? (
+          <button type="button" onClick={exportCsv} className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 px-3 py-1.5 text-xs font-medium hover:bg-neutral-50">
+            <Download size={13} /> Exporter en CSV
+          </button>
+        ) : undefined
+      }
+    >
+      <QueryBoundary loading={query.loading && !query.data} error={query.error} onRetry={query.refetch}>
+        {list.length === 0 ? (
+          <p className="text-sm text-neutral-500">Aucun abonné pour le moment.</p>
+        ) : (
+          <ul className="max-h-72 divide-y divide-neutral-100 overflow-y-auto">
+            {list.slice(0, 100).map((s) => (
+              <li key={s.id} className="flex items-center justify-between gap-4 py-2.5 text-sm">
+                <span className="truncate text-neutral-900">{s.email}</span>
+                <span className="shrink-0 text-xs text-neutral-500">{formatDate(s.createdAt)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </QueryBoundary>
+    </Card>
+  );
+}
 
 const AUDIENCES = {
   all: 'Tous les établissements',
@@ -101,6 +141,9 @@ export default function PlatformMessagesPage() {
             )}
           </QueryBoundary>
         </Card>
+      </div>
+      <div className="mt-6">
+        <NewsletterCard />
       </div>
       <ConfirmDialog
         open={confirming}

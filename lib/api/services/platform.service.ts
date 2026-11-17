@@ -1,5 +1,7 @@
+import type { Plan, PricingConfig } from '@/lib/plans';
 import { api } from '../client';
 import type { Pagination } from '@/lib/types/api';
+import type { InvoiceDocumentData } from '@/components/billing/InvoiceDocument';
 
 /** Selia platform administration (SUPER_ADMIN only, enforced by the API). */
 
@@ -59,17 +61,8 @@ export interface PlatformPayment {
   } | null;
 }
 
-export interface EmployeeTier {
-  min: number;
-  max: number | null;
-  price: number;
-}
-
-export interface BillingConfig {
-  pricePerSalon: number;
-  freeEmployeeThreshold: number;
-  pricePerEmployee: number;
-  employeeTiers: EmployeeTier[] | null;
+/** Price grid of the two plans plus where to pay and what to print. */
+export interface BillingConfig extends PricingConfig {
   currency: string;
   /** Where salons send their virement. */
   bankName?: string | null;
@@ -77,6 +70,15 @@ export interface BillingConfig {
   bankRib?: string | null;
   bankSwift?: string | null;
   transferNote?: string | null;
+  /** Legal identity printed on the invoices. */
+  companyName?: string | null;
+  companyAddress?: string | null;
+  companyIce?: string | null;
+  companyRc?: string | null;
+  companyIf?: string | null;
+  companyPatente?: string | null;
+  /** VAT in percent, prices VAT included. */
+  vatRate?: number;
   updatedAt?: string;
 }
 
@@ -93,9 +95,19 @@ export interface PlatformNotification {
 export interface AccountDetail {
   account: { id: string; isActive: boolean; createdAt: string };
   owner: { id: string; firstName: string; lastName: string; email: string; phone: string | null; createdAt: string } | null;
-  subscription: { status: string; subscribedAt: string | null; currentPeriodEnd: string | null; salonsPaid: number } | null;
+  subscription: {
+    status: string;
+    subscribedAt: string | null;
+    plan: Plan;
+    periodMonths: number;
+    nextPlan: Plan | null;
+    nextPeriodMonths: number | null;
+    currentPeriodStart: string | null;
+    currentPeriodEnd: string | null;
+    salonsPaid: number;
+  } | null;
   graceDays: number;
-  bill: { total: number; renewalDue: boolean; currency: string } | null;
+  bill: { total: number; renewalDue: boolean; currency: string; plan: Plan; months: number; mode: 'new' | 'renewal' | 'topup'; planIssue: string | null } | null;
   salons: {
     id: string;
     name: string;
@@ -170,6 +182,7 @@ export const JOURNAL_ACTIONS: Record<string, string> = {
   'platform.payment-reject': 'Virement refusé',
   'platform.invoice-issue': 'Facture émise',
   'platform.subscription': 'Abonnement modifié',
+  'platform.establishment-create': 'Établissement créé',
   'platform.salon-coverage': 'Activation offerte ou retirée',
   'platform.account': 'Compte activé ou désactivé',
   'platform.featured': 'Mise en avant',
@@ -262,7 +275,29 @@ export function adminPasswordError(password: string): string | null {
   return null;
 }
 
-export type SubscriptionChange = { action: 'extend'; months: number } | { action: 'setEnd'; date: string } | { action: 'cancel' } | { action: 'reactivate' };
+export type SubscriptionChange =
+  | { action: 'extend'; months: number }
+  | { action: 'setEnd'; date: string }
+  | { action: 'cancel' }
+  | { action: 'reactivate' }
+  | { action: 'setPlan'; plan: Plan; months: number };
+
+export interface NewEstablishment {
+  owner: { firstName: string; lastName: string; email: string; phone: string };
+  salon: { name: string; email?: string; phone?: string; city?: string; address?: string; category?: string };
+  plan: Plan;
+  months: number;
+  offeredMonths: number;
+}
+
+export interface CreatedEstablishment {
+  accountId: string;
+  salon: { id: string; name: string };
+  owner: { id: string; email: string };
+  emailSent: boolean;
+  inviteUrl: string;
+  inviteExpires: string;
+}
 
 const R = 'backend/superadmin';
 
@@ -283,6 +318,9 @@ export const platformService = {
     api.get<{ reviews: PlatformReview[]; reportedCount: number; pagination: Pagination }>(`${R}/reviews`, { query: params, signal }),
   removeReview: (id: string, reason: string) => api.post<{ success: boolean }>(`${R}/reviews/${encodeURIComponent(id)}/remove`, { reason }),
   reviewAction: (id: string, action: 'restore' | 'dismiss') => api.post<{ success: boolean }>(`${R}/reviews/${encodeURIComponent(id)}/${action}`),
+  /** Subscribers of the client site newsletter. */
+  newsletter: (signal?: AbortSignal) =>
+    api.get<{ subscribers: { id: string; email: string; source: string; createdAt: string }[] }>(`${R}/newsletter`, { signal }).then((r) => r.subscribers),
   broadcasts: (signal?: AbortSignal) => api.get<{ messages: Broadcast[] }>(`${R}/broadcasts`, { signal }).then((r) => r.messages),
   sendBroadcast: (input: { title: string; message: string; audience: 'all' | 'visible' }) =>
     api.post<{ sent: number; total: number }>(`${R}/broadcasts`, input),
@@ -294,6 +332,7 @@ export const platformService = {
   billingWatch: (signal?: AbortSignal) => api.get<BillingWatch>(`${R}/billing-watch`, { signal }),
   invoices: (range: { from?: string; to?: string }, signal?: AbortSignal) =>
     api.get<{ invoices: PlatformInvoice[]; total: number }>(`${R}/invoices`, { query: range, signal }),
+  invoice: (id: string, signal?: AbortSignal) => api.get<InvoiceDocumentData>(R + '/invoices/' + encodeURIComponent(id), { signal }),
   issueInvoice: (paymentId: string) => api.post<{ invoice: { id: string; invoiceNumber: string } }>(`${R}/payments/${encodeURIComponent(paymentId)}/invoice`),
   updateMe: (input: { firstName: string; lastName: string; email: string }) => api.put<{ user: PlatformAdmin }>(`${R}/me`, input),
   changeMyPassword: (input: { currentPassword: string; newPassword: string }) => api.put<{ success: boolean }>(`${R}/me/password`, input),
@@ -302,6 +341,8 @@ export const platformService = {
     api.post<{ admin: PlatformAdmin }>(`${R}/admins`, input),
   setAdminActive: (id: string, isActive: boolean) => api.patch<{ admin: PlatformAdmin }>(`${R}/admins/${encodeURIComponent(id)}`, { isActive }),
   account: (id: string, signal?: AbortSignal) => api.get<AccountDetail>(`${R}/accounts/${encodeURIComponent(id)}/detail`, { signal }),
+  /** The platform opens a salon for an owner, who gets a link to choose a password. */
+  createEstablishment: (input: NewEstablishment) => api.post<CreatedEstablishment>(`${R}/establishments`, input),
   changeSubscription: (id: string, change: SubscriptionChange) =>
     api.post<AccountDetail>(`${R}/accounts/${encodeURIComponent(id)}/subscription`, change),
   setSalonCovered: (salonId: string, covered: boolean) =>

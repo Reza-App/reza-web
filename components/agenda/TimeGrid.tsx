@@ -108,7 +108,7 @@ export function TimeGrid({
             return (
               <div
                 key={day.toISOString()}
-                className="relative border-l border-neutral-100"
+                className={`relative border-l border-neutral-100 ${days.length > 1 && isSameDay(day, today) ? 'bg-neutral-100/70' : ''}`}
                 style={{ height }}
                 onClick={(e) => {
                   if (e.target !== e.currentTarget) return;

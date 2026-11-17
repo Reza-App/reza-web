@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Printer } from 'lucide-react';
 import { Badge, PageHeader, Pagination, Table } from '@/components/ui/page';
 import { EmptyState, QueryBoundary } from '@/components/ui/states';
@@ -37,7 +38,11 @@ export default function SubscriptionInvoicesPage() {
               const period = i as typeof i & { periodStart?: string | null; periodEnd?: string | null };
               return (
                 <tr key={i.id} className={pager.rowClass(index)}>
-                  <td className="px-5 py-3 font-medium text-neutral-950">{i.invoiceNumber}</td>
+                  <td className="px-5 py-3 font-medium text-neutral-950">
+                    <Link href={`/dashboard/admin/mes-factures/liste-des-factures/${encodeURIComponent(i.id)}`} className="hover:underline">
+                      {i.invoiceNumber}
+                    </Link>
+                  </td>
                   <td className="px-5 py-3">{formatDate(i.createdAt)}</td>
                   <td className="px-5 py-3 text-neutral-600">
                     {period.periodStart ? `${formatDate(period.periodStart)} au ${formatDate(period.periodEnd)}` : '-'}

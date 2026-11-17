@@ -7,7 +7,7 @@ import { AuthLayout, Field, FormAlert, inputClass, SubmitButton } from '@/compon
 import { useAuth } from '@/contexts/AuthContext';
 import { ApiError, errorMessage } from '@/lib/api/errors';
 import { sessionService } from '@/lib/api/services/session.service';
-import { PLATFORM_HOME } from '@/lib/session';
+import { CLIENT_SITE_URL, PLATFORM_HOME } from '@/lib/session';
 import {
   type FieldErrors,
   hasErrors,
@@ -148,7 +148,7 @@ function LoginForm({ onForgot }: { onForgot: () => void }) {
           {!unverified && (
             <span className="mt-1 block">
               Vous êtes client ?{' '}
-              <a href="/client/connexion" className="font-semibold underline">
+              <a href={`${CLIENT_SITE_URL}/connexion`} className="font-semibold underline">
                 Connectez vous à l&apos;espace client
               </a>
             </span>
@@ -251,7 +251,17 @@ function SignupForm({ onDone }: { onDone: (email: string) => void }) {
       </Field>
       <label className="flex items-start gap-3 text-sm text-neutral-700">
         <input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)} className="mt-0.5 h-4 w-4 accent-neutral-950" />
-        <span>J&apos;accepte les conditions d&apos;utilisation et la politique de confidentialité de Selia.</span>
+        <span>
+          J&apos;accepte les{' '}
+          <a href="/legal/cgu-etablissements" target="_blank" rel="noreferrer" className="font-medium underline">
+            conditions des établissements
+          </a>{' '}
+          et la{' '}
+          <a href={`${CLIENT_SITE_URL}/confidentialite`} target="_blank" rel="noreferrer" className="font-medium underline">
+            politique de confidentialité
+          </a>{' '}
+          de Selia.
+        </span>
       </label>
       {errors.terms && <p className="text-xs text-red-700">{errors.terms}</p>}
       {formError && <FormAlert>{formError}</FormAlert>}
@@ -314,7 +324,9 @@ const TITLES: Record<Mode, { title: string; subtitle: string }> = {
 };
 
 function LoginScreen() {
-  const [mode, setMode] = useState<Mode>('login');
+  // "?mode=inscription" opens the sign up form (link from the client site).
+  const initialMode = useSearchParams().get('mode') === 'inscription' ? 'signup' : 'login';
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [registered, setRegistered] = useState<string | null>(null);
 
   return (
@@ -355,7 +367,7 @@ function LoginScreen() {
       )}
       <p className="mt-3 text-center text-xs text-neutral-400">
         Vous souhaitez réserver un rendez vous ?{' '}
-        <a href="/client/connexion" className="underline hover:text-neutral-700">
+        <a href={`${CLIENT_SITE_URL}/connexion`} className="underline hover:text-neutral-700">
           Espace client
         </a>
       </p>
