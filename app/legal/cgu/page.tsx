@@ -33,9 +33,9 @@ export default function ClientTermsPage() {
           ],
         },
         {
-          title: 'Annulation et absence',
+          title: 'Annulation, déplacement et absence',
           paragraphs: [
-            'Vous pouvez annuler en ligne tant que le délai fixé par l’établissement n’est pas dépassé. Passé ce délai, contactez directement l’établissement.',
+            'Vous pouvez annuler ou déplacer un rendez vous en ligne tant que le délai fixé par l’établissement n’est pas dépassé. Passé ce délai, contactez directement l’établissement.',
             'En cas d’absences répétées sans annulation, un établissement peut refuser vos prochaines réservations en ligne.',
           ],
         },

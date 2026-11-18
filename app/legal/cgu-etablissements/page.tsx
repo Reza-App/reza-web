@@ -19,7 +19,8 @@ export default function ProTermsPage() {
         {
           title: 'Abonnement et tarifs',
           paragraphs: [
-            'L’abonnement comprend des frais d’activation par salon, payés une seule fois, et un montant mensuel selon le nombre de collaborateurs, aux tarifs affichés dans l’espace « Abonnement et paiement ».',
+            'Deux plans existent : le plan Salon, dont le montant mensuel dépend du nombre de collaborateurs, et le plan Freelance, pour une personne seule. Une remise s’applique aux paiements de plusieurs mois. Les tarifs en vigueur sont affichés dans l’espace « Abonnement et paiement ».',
+            'Des collaborateurs peuvent être ajoutés en cours de période : seule la différence est due jusqu’à l’échéance.',
             'Le règlement se fait par virement bancaire. L’abonnement est activé ou prolongé à la validation du virement par Selia, qui émet alors la facture correspondante.',
           ],
         },
