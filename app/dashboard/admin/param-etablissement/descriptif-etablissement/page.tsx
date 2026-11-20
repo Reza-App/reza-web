@@ -8,6 +8,7 @@ import { SaveActions, ToggleRow } from '@/components/ui/settings';
 import { QueryBoundary } from '@/components/ui/states';
 import { useSettingsForm } from '@/hooks/useSettingsForm';
 import { tenantService } from '@/lib/api/services/tenant.service';
+import { ACCEPTED_PAYMENTS, type AcceptedPayment, isAcceptedPayment } from '@/lib/payments';
 import { isValidEmail, isValidPhone, normalizePhone } from '@/lib/validation';
 
 interface Profile {
@@ -22,6 +23,8 @@ interface Profile {
   googleMapsLink: string;
   description: string;
   amenities: string[];
+  /** Payment methods accepted at the salon, shown to clients. */
+  acceptedPayments: AcceptedPayment[];
   instagram: string;
   facebook: string;
   tiktok: string;
@@ -68,6 +71,7 @@ async function load(signal: AbortSignal): Promise<Profile> {
     googleMapsLink: text(tenant.googleMapsLink),
     description: readableDescription(settings.description),
     amenities: Array.isArray(settings.amenities) ? settings.amenities : [],
+    acceptedPayments: Array.isArray(settings.acceptedPayments) ? settings.acceptedPayments.filter(isAcceptedPayment) : [],
     instagram: text(social.instagram),
     facebook: text(social.facebook),
     tiktok: text(social.tiktok),
@@ -99,6 +103,7 @@ async function save(p: Profile) {
     tenantService.updateSettings({
       description: p.description.trim(),
       amenities: p.amenities,
+      acceptedPayments: p.acceptedPayments,
       socialMedia: { instagram: p.instagram.trim(), facebook: p.facebook.trim(), tiktok: p.tiktok.trim() },
       showMap: p.showMap,
       showOpeningHours: p.showOpeningHours,
@@ -266,6 +271,36 @@ export default function SalonProfilePage() {
                     <Plus size={15} />
                   </SecondaryButton>
                 </form>
+              </Card>
+              <Card title="Moyens de paiement acceptés">
+                <p className="mb-2 text-sm text-neutral-500">Affichés sur votre page Selia et au moment de la réservation.</p>
+                <div className="divide-y divide-neutral-100">
+                  {ACCEPTED_PAYMENTS.map((m) => (
+                    <ToggleRow
+                      key={m.code}
+                      title={m.label}
+                      checked={p.acceptedPayments.includes(m.code)}
+                      onChange={(on) =>
+                        form.setDraft(
+                          (d) =>
+                            d && {
+                              ...d,
+                              acceptedPayments: on
+                                ? [...d.acceptedPayments.filter((x) => x !== m.code), m.code]
+                                : d.acceptedPayments.filter((x) => x !== m.code),
+                            },
+                        )
+                      }
+                    />
+                  ))}
+                  <div className="flex items-center justify-between gap-3 py-3 opacity-60">
+                    <div>
+                      <p className="text-sm font-medium text-neutral-950">Paiement en ligne par carte</p>
+                      <p className="text-xs text-neutral-500">Les clients paieront à la réservation, sur Selia.</p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-neutral-100 px-3 py-1 text-xs font-medium text-neutral-700">Bientôt disponible</span>
+                  </div>
+                </div>
               </Card>
               <Card title="Réseaux sociaux">
                 <div className="space-y-3">

@@ -37,6 +37,8 @@ export interface SubscriptionBill {
     id: string;
     name: string;
     employeeCount: number;
+    /** Collaborators paid for (chosen, never below the active ones). */
+    seats: number;
     employeesPaid: number;
     billableEmployees: number;
     salonCovered: boolean;
@@ -86,16 +88,25 @@ export const PAYMENT_STATUS_LABELS: Record<SubscriptionPaymentStatus, string> = 
 };
 
 
+/** "id:5,id2:3": places chosen per salon, as the API reads them in a query. */
+function seatsQuery(seats?: Record<string, number>): string | undefined {
+  const parts = Object.entries(seats ?? {}).map(([id, n]) => `${id}:${n}`);
+  return parts.length ? parts.join(',') : undefined;
+}
+
 export const subscriptionService = {
   /** Overview; plan and months preview another choice. */
-  overview: (choice: { plan?: Plan; months?: number } = {}, signal?: AbortSignal) =>
-    api.get<SubscriptionOverview>('backend/subscription', { query: choice, signal }),
+  overview: (choice: { plan?: Plan; months?: number; seats?: Record<string, number> } = {}, signal?: AbortSignal) =>
+    api.get<SubscriptionOverview>('backend/subscription', {
+      query: { plan: choice.plan, months: choice.months, seats: seatsQuery(choice.seats) },
+      signal,
+    }),
   payments: (signal?: AbortSignal) =>
     api.get<{ payments: SubscriptionPayment[] }>('backend/subscription/payments', { signal }).then((r) => r.payments),
   /** Plan and period length for the next period (at once without a running period). */
   setPlan: (plan: Plan, months: number) => api.put<SubscriptionOverview>('backend/subscription/plan', { plan, months }),
   /** Declares a bank transfer; a Selia administrator approves it. */
-  declareTransfer: (input: { amount: number; reference?: string; payerName?: string; plan: Plan; months: number }) =>
+  declareTransfer: (input: { amount: number; reference?: string; payerName?: string; plan: Plan; months: number; seats?: Record<string, number> }) =>
     api.post<{ payment: SubscriptionPayment }>('backend/subscription/declare-payment', input),
   invoice: (id: string, signal?: AbortSignal) => api.get<InvoiceDocumentData>('backend/tenant/subscription-invoices/' + encodeURIComponent(id), { signal }),
   invoices: (signal?: AbortSignal) =>

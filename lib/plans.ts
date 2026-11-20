@@ -55,3 +55,23 @@ export function discountsLine(p: PricingConfig): string {
 export function freelanceGrid(p: PricingConfig): string {
   return `${formatMoney(p.freelanceMonthly)} par mois, ${formatMoney(p.freelance6)} les 6 mois, ${formatMoney(p.freelance12)} l'année.`;
 }
+
+/** Collaborators billed at each tier for a salon of `team` people. */
+function salonTiers(team: number, p: PricingConfig) {
+  const n = Math.max(1, Math.floor(team));
+  const next = Math.min(n - 1, p.salonNextCount);
+  const extra = Math.max(0, n - 1 - p.salonNextCount);
+  return { next, extra };
+}
+
+/** Monthly price of one salon with `team` collaborators (same as the API). */
+export function salonMonthly(team: number, p: PricingConfig): number {
+  const { next, extra } = salonTiers(team, p);
+  return p.salonFirstPrice + next * p.salonNextPrice + extra * p.salonExtraPrice;
+}
+
+/** "200 + 3 × 100 + 2 × 10": how the monthly price of `team` is built. */
+export function salonFormula(team: number, p: PricingConfig): string {
+  const { next, extra } = salonTiers(team, p);
+  return [String(p.salonFirstPrice), next > 0 ? `${next} × ${p.salonNextPrice}` : '', extra > 0 ? `${extra} × ${p.salonExtraPrice}` : ''].filter(Boolean).join(' + ');
+}

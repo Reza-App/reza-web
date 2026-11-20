@@ -2,7 +2,7 @@
 
 import { PAYMENT_STATUS_TONES, statusTone } from '@/lib/status';
 import { useState } from 'react';
-import { Check, Copy, Landmark } from 'lucide-react';
+import { Check, Copy, Landmark, Minus, Plus } from 'lucide-react';
 import { FormField, Modal, PrimaryButton, SecondaryButton, fieldClass } from '@/components/ui/modal';
 import { Badge, Card, PageHeader, StatCard, Table } from '@/components/ui/page';
 import { QueryBoundary } from '@/components/ui/states';
@@ -21,8 +21,11 @@ import {
   PLAN_LABELS,
   PLAN_PITCH,
   type PlanQuote,
+  salonFormula,
   salonGrid,
+  salonMonthly,
 } from '@/lib/plans';
+import type { PricingConfig } from '@/lib/plans';
 
 /** Bank account the virement goes to, with a copy button for the RIB. */
 function BankBox({ bank, compact = false }: { bank: BankDetails; compact?: boolean }) {
@@ -81,7 +84,7 @@ function TransferDialog({
 }: {
   amount: number;
   bank: BankDetails;
-  choice: { plan: Plan; months: number; label: string };
+  choice: { plan: Plan; months: number; label: string; seats?: Record<string, number> };
   onClose: () => void;
   onDone: () => void;
 }) {
@@ -97,7 +100,7 @@ function TransferDialog({
     setError(null);
     try {
       // The amount is the bill's: the server refuses any other amount.
-      await subscriptionService.declareTransfer({ amount, reference: reference.trim() || undefined, payerName: payerName.trim(), plan: choice.plan, months: choice.months });
+      await subscriptionService.declareTransfer({ amount, reference: reference.trim() || undefined, payerName: payerName.trim(), plan: choice.plan, months: choice.months, seats: choice.seats });
       toast.success('Virement déclaré. Selia le valide dès réception sur son compte.');
       onDone();
       onClose();
@@ -222,6 +225,83 @@ function NextPlan({ bill, pricingText, onSaved }: { bill: SubscriptionBill; pric
   );
 }
 
+/** Salon plan: the price grid and how many collaborators to pay for in each salon (never below its active team). */
+function SalonSeats({
+  pricing,
+  salons,
+  onSeats,
+  busy,
+}: {
+  pricing: PricingConfig;
+  salons: SubscriptionBill['salons'];
+  onSeats: (salonId: string, seats: number) => void;
+  busy: boolean;
+}) {
+  const p = pricing;
+  const tiers = [
+    { who: '1er collaborateur', price: formatMoney(p.salonFirstPrice) },
+    ...(p.salonNextCount > 0
+      ? [{ who: p.salonNextCount === 1 ? '2e collaborateur' : `Du 2e au ${p.salonNextCount + 1}e`, price: `${formatMoney(p.salonNextPrice)} chacun` }]
+      : []),
+    { who: `À partir du ${p.salonNextCount + 2}e`, price: `${formatMoney(p.salonExtraPrice)} chacun` },
+  ];
+  const step =
+    'flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-neutral-950 text-neutral-950 transition hover:bg-neutral-100 disabled:border-neutral-200 disabled:text-neutral-300 disabled:hover:bg-transparent';
+  return (
+    <Card title="Nombre de collaborateurs">
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+        <div>
+          <p className="mb-3 text-sm text-neutral-500">Plan Salon, prix par salon et par mois.</p>
+          <ul className="divide-y divide-neutral-100 text-sm">
+            {tiers.map((t) => (
+              <li key={t.who} className="flex justify-between gap-3 py-2.5">
+                <span className="text-neutral-700">{t.who}</span>
+                <span className="font-medium tabular-nums text-neutral-950">{t.price}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-xs text-neutral-500">{discountsLine(p)}</p>
+        </div>
+        <div className="space-y-3">
+          {salons.map((s) => {
+            const min = Math.max(1, s.employeeCount);
+            const n = Math.max(min, s.seats);
+            const ahead = n - s.employeeCount;
+            return (
+              <div key={s.id} className="rounded-2xl bg-neutral-50 p-5">
+                <p className="text-sm font-medium text-neutral-950">{salons.length > 1 ? `${s.name} : collaborateurs à payer` : 'Collaborateurs à payer'}</p>
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <button type="button" aria-label="Un collaborateur de moins" className={step} disabled={busy || n <= min} onClick={() => onSeats(s.id, n - 1)}>
+                      <Minus size={16} />
+                    </button>
+                    <span className="min-w-32 text-center text-base font-medium tabular-nums text-neutral-950">
+                      {n} collaborateur{n > 1 ? 's' : ''}
+                    </span>
+                    <button type="button" aria-label="Un collaborateur de plus" className={step} disabled={busy || n >= 200} onClick={() => onSeats(s.id, n + 1)}>
+                      <Plus size={16} />
+                    </button>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xl font-medium tabular-nums text-neutral-950">{formatMoney(salonMonthly(n, p))} / mois</p>
+                    <p className="text-xs tabular-nums text-neutral-500">{salonFormula(n, p)}</p>
+                  </div>
+                </div>
+                <p className="mt-3 text-xs text-neutral-500">
+                  {s.employeeCount} collaborateur{s.employeeCount > 1 ? 's' : ''} actif{s.employeeCount > 1 ? 's' : ''} aujourd&apos;hui
+                  {ahead > 0
+                    ? `, ${ahead} place${ahead > 1 ? 's' : ''} d'avance pour vos prochains recrutements.`
+                    : '. Ajoutez des places pour vos prochains recrutements.'}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 /** Plan and period choice, with the price of each option for this account. */
 function PlanPicker({
   quotes,
@@ -325,7 +405,12 @@ function PlanPicker({
 export default function SubscriptionPaymentPage() {
   // null: the subscription's own plan; set when the owner picks another option.
   const [choice, setChoice] = useState<{ plan: Plan; months: number } | null>(null);
-  const overview = useApiQuery(`subscription:${choice?.plan ?? ''}:${choice?.months ?? ''}`, (signal) => subscriptionService.overview(choice ?? {}, signal));
+  // Collaborators to pay for per salon, when the owner changed it.
+  const [seats, setSeats] = useState<Record<string, number>>({});
+  const seatsKey = Object.entries(seats).map(([id, n]) => `${id}:${n}`).join(',');
+  const overview = useApiQuery(`subscription:${choice?.plan ?? ''}:${choice?.months ?? ''}:${seatsKey}`, (signal) =>
+    subscriptionService.overview({ ...(choice ?? {}), seats }, signal),
+  );
   const payments = useApiQuery('subscription-payments', (signal) => subscriptionService.payments(signal));
   const [declaring, setDeclaring] = useState(false);
   const data = overview.data;
@@ -388,6 +473,10 @@ export default function SubscriptionPaymentPage() {
                 hint={`${durationLabel(sub.periodMonths)}, ${bill.employeeCount} collaborateur${bill.employeeCount > 1 ? 's' : ''}`}
               />
             </div>
+
+            {pricing && bill.plan === 'SALON' && (
+              <SalonSeats pricing={pricing} salons={bill.salons} busy={overview.loading} onSeats={(id, n) => setSeats((prev) => ({ ...prev, [id]: n }))} />
+            )}
 
             <Card title={topUp ? 'Votre formule' : bill.renewalDue ? 'Formule de la prochaine période' : 'Choisissez votre formule'}>
               {topUp ? (
@@ -499,7 +588,7 @@ export default function SubscriptionPaymentPage() {
         <TransferDialog
           amount={bill.total}
           bank={data.bank}
-          choice={{ plan: bill.plan, months: bill.months, label: choiceLabel }}
+          choice={{ plan: bill.plan, months: bill.months, label: choiceLabel, seats }}
           onClose={() => setDeclaring(false)}
           onDone={() => {
             void payments.refetch();

@@ -45,6 +45,8 @@ export interface TenantSettings {
   timezone?: string;
   currency?: string;
   amenities?: string[] | null;
+  /** Payment methods accepted at the salon: CASH, CARD, TRANSFER, CHECK. */
+  acceptedPayments?: string[] | null;
   badges?: string[] | null;
   socialMedia?: Record<string, string> | null;
   showMap?: boolean;
